@@ -1,0 +1,5 @@
+--disable-werror
+--disable-odk
+--with-jdk-home=/etc/alternatives/java_sdk_17
+--enable-kf5
+--enable-python=internal
