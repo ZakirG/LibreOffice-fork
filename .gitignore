@@ -205,3 +205,15 @@ core/generated/prisma
 
 .env
 .env.local
+
+.terraform/
+*.tfstate
+*.tfstate.*
+.crash
+*.log
+*.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl  # (Optional: commit only if you want deterministic provider versions)

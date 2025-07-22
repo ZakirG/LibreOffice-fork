@@ -3,7 +3,7 @@
 This document contains step-by-step prompts for implementing features 1 and 2 from the PRD: Modern authentication and Save to Cloud functionality.
 
 ```
-PHASE 1: AWS Infrastructure Setup with OpenTofu
+✅ PHASE 1: AWS Infrastructure Setup with OpenTofu
 
 Human Actions Required:
 - Create AWS account and configure AWS CLI with credentials. Done, we have AWS_ACCESS_KEY and AWS_SECRET_ACCESS_KEY in .env
@@ -29,15 +29,15 @@ Run "tofu plan" in both dev and prod environments - should show valid plan with 
 
 Human Test:
 Run "tofu apply" in dev environment and verify in AWS console:
-- Cognito User Pool exists with hosted UI configured
-- S3 bucket exists and is properly secured (no public access)
+- Cognito User Pool exists with hosted UI configured. Yes, i see libre-cloud-dev in AWS console.
+- S3 bucket exists and is properly secured (no public access). Yes, i see libre-cloud-docs-dev-2aycu2ho
 - DynamoDB tables exist with correct schema
 - IAM roles have appropriate permissions
 - SSM parameters are populated
 
 ---
 
-PHASE 2: Next.js Project Setup
+✅ PHASE 2: Next.js Project Setup
 
 Human Actions Required:
 - Create Vercel account and install Vercel CLI
