@@ -1,135 +1,178 @@
-Implementation Plan — Next.js Webapp for Auth + Cloud Docs (S3) for LibreOffice Fork
+Implementation plan (no code) for the Next.js webapp that handles auth + cloud docs for the LibreOffice fork, staying AWS-first and provisioned with OpenTofu.
 
 ---
 
-1. Scope & Responsibilities
+1. High-level architecture
 
-* Provide user authentication (NextAuth, email + social).
-* Broker secure access to S3 via short‑lived pre‑signed URLs.
-* Expose a minimal REST/JSON API the desktop app (LibreOffice fork) can hit for login handoff and Save/Refresh.
-* Render a mobile-friendly dashboard for browsing/previewing documents (and playing embedded MP3s).
-* Store minimal metadata (user, docs, last\_modified) to speed listings and sharing later.
-
----
-
-2. Core Architecture
-
-* Next.js on Vercel (Pages or App Router; pick one and stay consistent).
-* NextAuth for identity/session (JWT strategy).
-* Postgres (Neon/PlanetScale/RDS) via Prisma (sessions, users, doc metadata).
-* AWS S3 for binary file storage.
-* AWS SDK v3 in API routes for presigning.
-* Optional Redis (Upstash) for short-lived device/desktop login tokens (nonce polling).
-* Desktop <-> Web auth bridge using browser-based OAuth and a polling/nonce or local-loopback callback.
+* Frontend/UI: Next.js (App Router) deployed on Vercel.
+* Auth: Amazon Cognito User Pool (OAuth2 Authorization Code + PKCE). NextAuth will use Cognito as an OAuth provider for web; desktop uses a “device login” flow you implement on top of Cognito.
+* Persistence/metadata: DynamoDB (user -> document index, upload metadata, desktop auth nonces).
+* Object storage: S3 bucket for documents/audio. Access only via short-lived pre-signed URLs issued by your API.
+* API layer: Next.js Route Handlers (/app/api/\*) for auth callbacks, presign endpoints, document list APIs. These call AWS SDKs directly.
+* Background processing (if needed later): Lambda invoked via EventBridge (OpenTofu provisioned).
+* Secrets/config: AWS SSM Parameter Store; pushed to Vercel via CI at deploy time.
+* Edge caching (optional later): CloudFront in front of S3 for GETs that can be public or signed URLs.
+* Infra-as-code: OpenTofu modules for Cognito, S3, DynamoDB, Parameter Store, IAM roles/policies.
 
 ---
 
-3. Data/Objects You’ll Manage
+2. AWS resources to provision with OpenTofu
 
-* User table: id, email, created\_at.
-* Document table: id (uuid), user\_id, filename, s3\_key, size, mime, updated\_at.
-* DesktopLoginNonce table or Redis key: nonce, user\_id (nullable until login), expires\_at.
-* (Optional) DocRevisions table if you want history.
-* S3 key convention: `${user_id}/${doc_id}.odt` (and `.json` for metadata, `.mp3` for audio clips, etc.).
+* S3:
 
----
+  * Bucket: libre-docs (private).
+  * Bucket policy denying all public access.
+* DynamoDB:
 
-4. API Surface (serverless routes)
+  * Table: documents (PK: userId, SK: docId) with GSI on docId if needed.
+  * Table: desktop\_login (PK: nonce) storing temporary login handshakes (nonce, userId, expiresAt).
+* Cognito:
 
-* POST /api/desktop/init-login  → returns { nonce }.
-* GET  /api/desktop/token?nonce=… → returns { jwt } once user completes browser login.
-* GET  /api/docs                → list docs for current session user (DB read, maybe S3 list fallback).
-* POST /api/docs/presign?mode=put|get\&docId=… → returns { url, key, contentType }.
-* POST /api/docs/metadata       → upsert doc metadata after successful upload.
-* (Optional) GET /api/docs/\:id   → stream/transform doc for preview (or just redirect to signed GET).
-  All routes enforce auth via getServerSession() or bearer JWT from desktop.
+  * User Pool, hosted UI domain, app client (no secret, PKCE enabled).
+  * Callback URLs: [https://yourapp.vercel.app/api/auth/callback/cognito](https://yourapp.vercel.app/api/auth/callback/cognito)
+  * Logout URLs: [https://yourapp.vercel.app/](https://yourapp.vercel.app/)
+  * Allowed OAuth scopes: openid, email, profile, and custom if needed.
+* IAM:
 
----
+  * Role with minimal S3 PutObject/GetObject permissions restricted by key prefix \${userId}/\* for presign commands (the presign happens server-side, but still follow least privilege).
+  * Policy to allow DynamoDB CRUD on your two tables.
+* SSM Parameter Store:
 
-5. Auth Flow Variants
-   A) Regular Web/Mobile:
-
-* User hits /login → NextAuth providers → session cookie (httpOnly).
-* All dashboard pages gate on session.
-
-B) Desktop App (device-code style):
-
-* Desktop calls /api/desktop/init-login → gets nonce and opens system browser: [https://app.vercel.app/desktop-login?nonce=XYZ](https://app.vercel.app/desktop-login?nonce=XYZ)
-* User logs in (NextAuth). After success, web page POSTs to /api/desktop/bind-nonce with session user → store user\_id against nonce in Redis.
-* Desktop polls /api/desktop/token?nonce=XYZ. When ready, server issues a signed short-lived JWT (different from NextAuth cookie) for API use.
-* Desktop stores that JWT locally and uses it on every presign/metadata call (Authorization: Bearer).
-
-(Alternative: run a local HTTP listener and use OAuth redirect there. This plan keeps web simple.)
+  * /libreapp/cognito/client\_id
+  * /libreapp/cognito/pool\_id
+  * /libreapp/aws/region
+  * /libreapp/s3/bucket
+  * SMTP creds if you add magic links, etc.
+* Optionally ElastiCache (Redis) if you prefer it over DynamoDB for the desktop nonce store. DynamoDB is fine and simpler.
+* (Optional) CloudFront distribution fronting S3 for GET-only doc viewing (mp3 streaming). You would still generate signed CloudFront URLs instead of S3 pre-signed if you want CDN.
 
 ---
 
-6. Document Save/Refresh Flow (Desktop)
-   Save to Cloud:
+3. Next.js project structure (no code, just paths)
 
-* Desktop: call /api/docs/presign?mode=put\&docId=… → receive signed PUT URL.
-* Desktop: PUT file bytes to S3 directly.
-* Desktop: POST /api/docs/metadata with size, name, updated\_at.
-  Refresh from Cloud:
-* Desktop: call /api/docs/presign?mode=get\&docId=… → receive signed GET URL.
-* Desktop: GET and overwrite local doc.
+* /app
 
----
+  * /dashboard (lists docs)
+  * /doc/\[id] (renders doc viewer)
+  * /desktop-login (page to initiate desktop auth handshake)
+  * /desktop-done (page hit after Cognito redirect to finalize handshake)
+* /app/api
 
-7. Mobile Dashboard UX
-
-* /dashboard lists docs (query DB; fallback: S3 ListObjectsV2 if DB missing).
-* /doc/\[id] displays title, last modified, play button if associated MP3 exists.
-* For MP3: request GET presign and stream via HTML5 audio.
-* Responsive CSS (Tailwind) + no heavy client libs.
-
----
-
-8. Security & Config
-
-* AWS IAM user with policy: s3\:PutObject/GetObject/ListBucket limited to your bucket (but only from backend).
-* Vercel env vars: NEXTAUTH\_SECRET, NEXTAUTH\_URL, DB\_URL, AWS\_ACCESS\_KEY\_ID, AWS\_SECRET\_ACCESS\_KEY, AWS\_REGION, S3\_BUCKET, REDIS\_URL (if used), EMAIL SMTP creds.
-* Short presign expiry (<= 60s). Desktop should upload immediately.
-* Validate docId belongs to session.user.id before presigning.
-* Log all presign calls for debugging.
+  * /auth/\[...nextauth]/route.ts (NextAuth handler using Cognito provider)
+  * /presign/route.ts (POST: returns PUT/GET pre-signed URL)
+  * /documents/route.ts (GET: list docs; POST: register new doc meta)
+  * /desktop-token/route.ts (GET: desktop polls with nonce; returns JWT/session token once login done)
+  * /desktop-init/route.ts (POST: desktop requests a nonce)
+* /lib (AWS SDK wrappers, token validators)
+* /infra (Optional: place OpenTofu configs here, or separate repo)
+* /scripts (CI sync of SSM params to Vercel env)
 
 ---
 
-9. Human User Actions (End Users)
+4. Auth flows in detail
 
-* Visit web app, click “Login” (email magic link or Google).
-* View dashboard, tap a doc, preview/read text, play MP3.
-* On desktop LibreOffice fork:
+4.1 Web/mobile (browser)
 
-  * Click “Login to Cloud” → browser opens; user signs in.
-  * Click “Save to Cloud” → file uploads.
-  * Later “Refresh from Cloud” → pulls latest.
+* User hits /dashboard. If no session, redirect to /api/auth/signin (NextAuth → Cognito Hosted UI).
+* Cognito returns code → NextAuth exchanges for tokens → session JWT stored in secure cookies.
+* User now calls /api/presign etc., validated via getServerSession.
 
----
+4.2 Desktop (device login style)
 
-10. AI Coding Agent Actions (What you tell your code-gen assistant)
-
-* Scaffold Next.js project (choose Pages or App Router, specify).
-* Install and configure NextAuth with providers (email + Google) and Prisma adapter.
-* Generate Prisma schema for users, sessions, documents, nonces; run migrations.
-* Implement /api/desktop/init-login, /api/desktop/bind-nonce, /api/desktop/token with Redis or DB TTL records.
-* Implement /api/docs, /api/docs/presign, /api/docs/metadata with auth checks.
-* Implement S3 client + getSignedUrl helpers.
-* Build dashboard pages: list, detail, audio player, auth guard.
-* Add responsive styling (Tailwind).
-* Configure Vercel project: env vars, build settings, custom domain.
-* Write desktop-side HTTP spec (JSON payloads, headers) and document it.
-* Add logging & basic error handling (expired nonce, missing docId, invalid token).
-* Write minimal integration tests for presign routes and auth gating.
-* (Optional) Add rate limiting middleware for presign endpoints.
-* (Optional) Add share links & ACL groundwork (future).
+* LibreOffice fork launches browser to [https://yourapp.vercel.app/desktop-login?nonce={generated\_by\_desktop}](https://yourapp.vercel.app/desktop-login?nonce={generated_by_desktop})
+* /desktop-login stores nonce in DynamoDB with status=pending, expiresAt \~5 min.
+* Redirect user to Cognito Hosted UI.
+* After login, Cognito returns to /api/auth/callback/cognito → NextAuth sets session.
+* /desktop-done page detects a valid session, then writes userId into desktop\_login table for that nonce and marks status=ready. Shows “You can go back to the app”.
+* Desktop polls /api/desktop-token?nonce=... every few seconds. When ready, API verifies record and returns a short-lived “desktop JWT”. Desktop stores it encrypted locally and uses it as Bearer for subsequent API calls.
+* (Optional) Rotate desktop token by exposing /api/token/refresh using refresh token stored server-side.
 
 ---
 
-11. Milestones
-    M1: Auth + DB running locally (NextAuth sign-in works).
-    M2: Presign API endpoints functional; manual curl uploads to S3 succeed.
-    M3: Desktop nonce login handshake works end-to-end.
-    M4: Dashboard lists docs and plays MP3.
-    M5: Polish, error states, deploy to prod Vercel + AWS.
+5. Document “Save to Cloud” and “Refresh from Cloud”
 
-Done. Ping me when you want exact API contracts or Prisma schema.
+5.1 Upload flow
+
+* Desktop requests /api/presign?mode=put\&docId=xyz with Authorization: Bearer desktopJWT.
+* Handler validates user, checks they are allowed to write docId (either new or owned).
+* Generates pre-signed PUT URL for key: \${userId}/\${docId}.odt (or .odg etc.).
+* Desktop uploads binary directly to S3 via HTTPS PUT.
+* Desktop then POSTs /api/documents to record/update metadata (size, hash, updatedAt).
+
+5.2 Download flow
+
+* Desktop requests /api/presign?mode=get\&docId=xyz.
+* Gets pre-signed GET; downloads file.
+
+5.3 Mobile/web viewing
+
+* /dashboard fetches doc list from DynamoDB.
+* /doc/\[id] fetches a short-lived GET URL and either streams content or converts to a preview (you could add Lambda for HTML preview later; out of scope now).
+
+---
+
+6. Security & session management
+
+* All API routes validate Cognito-issued JWT via NextAuth (server-side) or custom verifier (desktop JWT).
+* Short expiry (e.g., 60s) on presigned URLs.
+* DynamoDB TTL attribute on desktop\_login rows for auto-expiration.
+* Encrypt desktop JWT at rest using OS keychain or simple AES with hardware-bound key if possible.
+* Set CSP/secure headers in Next.js middleware.
+
+---
+
+7. OpenTofu provisioning workflow
+
+* Separate IaC repo or /infra directory.
+* Modules:
+
+  * modules/cognito-user-pool
+  * modules/s3-bucket
+  * modules/dynamodb-table
+  * modules/iam-roles
+  * modules/ssm-params
+* Root stacks per environment (dev, prod).
+* Use OpenTofu state in an S3 backend with DynamoDB state locking.
+* Pipeline:
+
+  * GitHub Actions: run `tofu plan` on PR, `tofu apply` on main.
+  * After apply, sync required outputs (client\_id, pool\_id, bucket name, region) to Vercel via `vercel env pull` or Vercel API.
+
+---
+
+8. CI/CD pipeline overview
+
+* GitHub Actions (or CodeBuild):
+
+  * Job 1: OpenTofu fmt/validate/plan/apply.
+  * Job 2: Pull SSM params and set Vercel env vars.
+  * Job 3: Trigger Vercel deploy via `vercel --prod`.
+* Optional: run lint/test before deploy.
+
+---
+
+9. Observability & ops
+
+* CloudWatch logs for Cognito/Lambda (if used) and DynamoDB metrics.
+* Add simple structured logging in Next.js API routes (ship to Datadog or use Vercel Logs).
+* DynamoDB alarms on throttled writes/reads.
+* S3 metrics for data transfer/requests.
+
+---
+
+10. Local development
+
+* Use `dotenv` for local env; create a separate Cognito user pool dev stack via OpenTofu.
+* For S3/DynamoDB, either point to AWS dev resources or use LocalStack (if you want full offline).
+* NextAuth dev callback: [http://localhost:3000/api/auth/callback/cognito](http://localhost:3000/api/auth/callback/cognito)
+* Desktop dev: allow an HTTP redirect to localhost for testing or use the same nonce polling flow.
+
+---
+
+11. Future-proofing
+
+* Multi-user doc sharing: add a documents\_shared table or a GSI on documents for docId -> permissions list.
+* Collaborative editing: later integrate a CRDT service (e.g., yjs) fronted by WebSocket on AWS (API Gateway WebSockets + Lambda or self-hosted SignalR equivalent).
+* AI “Smart Rewrite”: add a Lambda that calls Bedrock or OpenAI, triggered via Next.js API.
+
+That’s the full plan. Tell me which piece you want expanded next (schemas, nonce handshake sequence, OpenTofu module variables/outputs, etc.).
