@@ -7,22 +7,21 @@ This document provides a step-by-step guide for an AI coding agent to build the 
 ### Step 1.1: Project Scaffolding and Setup
 
 **Human User Actions:**
-- Ensure Node.js (v18+) and pnpm are installed.
 - Create a project directory for the web app.
 - Sign up for a free tier Postgres database provider (e.g., Neon).
 - Copy the Postgres connection string. It will look like: `postgresql://user:password@host:port/dbname`.
 - Create a new Google Cloud Platform project.
 - In the GCP console, navigate to "APIs & Services" -> "Credentials".
 - Create an "OAuth 2.0 Client ID" for a "Web application".
-- Add `http://localhost:3000` to "Authorized JavaScript origins".
-- Add `http://localhost:3000/api/auth/callback/google` to "Authorized redirect URLs".
+- Add `http://localhost:3009` to "Authorized JavaScript origins".
+- Add `http://localhost:3009/api/auth/callback/google` to "Authorized redirect URLs".
 - Copy the "Client ID" and "Client Secret".
 - In your project directory, create a file named `.env.local`.
 - Add the following environment variables to `.env.local`, replacing the placeholder values:
   `DATABASE_URL="your_postgres_connection_string"`
   `GOOGLE_CLIENT_ID="your_google_client_id"`
   `GOOGLE_CLIENT_SECRET="your_google_client_secret"`
-  `NEXTAUTH_URL="http://localhost:3000"`
+  `NEXTAUTH_URL="http://localhost:3009"`
   `NEXTAUTH_SECRET="generate_a_secret_using_openssl_rand_base64_32"`
 
 **AI Coding Agent Prompt:**
@@ -36,7 +35,7 @@ This document provides a step-by-step guide for an AI coding agent to build the 
 **Human User Test:**
 - Run `pnpm install` in your terminal.
 - Run `pnpm dev`.
-- The Next.js application should start without errors on `http://localhost:3000`.
+- The Next.js application should start without errors on `http://localhost:3009`.
 
 ### Step 1.2: Database Schema and UI
 
@@ -74,7 +73,7 @@ This document provides a step-by-step guide for an AI coding agent to build the 
 **Human User Test:**
 - Run `pnpm exec prisma db push` to sync the database schema.
 - Run `pnpm dev`.
-- Navigate to `http://localhost:3000`.
+- Navigate to `http://localhost:3009`.
 - Click the "Sign in with Google" button and complete the authentication flow.
 - You should be redirected to `/dashboard` and see your email address.
 - Verify in your Postgres database that a new user has been created in the `User` table.
@@ -137,7 +136,7 @@ This document provides a step-by-step guide for an AI coding agent to build the 
 **Human User Test:**
 - Manually add a dummy document record to your `Document` table in the database, associating it with your user ID.
 - Log into the web application.
-- Use a tool like `curl` or Postman to make a `GET` request to `http://localhost:3000/api/docs/presign?mode=put&docId=your_doc_id`.
+- Use a tool like `curl` or Postman to make a `GET` request to `http://localhost:3009/api/docs/presign?mode=put&docId=your_doc_id`.
 - Verify you receive a JSON object with a signed S3 URL.
 - Create a small test file (e.g., `test.txt`).
 - Use `curl` to upload the file to the signed URL: `curl -X PUT --upload-file test.txt "THE_SIGNED_URL"`.
@@ -172,9 +171,9 @@ This document provides a step-by-step guide for an AI coding agent to build the 
 
 **Human User Test:**
 1. Run the web app with `pnpm dev`.
-2. In a terminal, get a nonce: `curl -X POST http://localhost:3000/api/desktop/init-login`. Copy the returned nonce.
-3. In your browser, open `http://localhost:3000/desktop-login?nonce=THE_NONCE_YOU_GOT`.
+2. In a terminal, get a nonce: `curl -X POST http://localhost:3009/api/desktop/init-login`. Copy the returned nonce.
+3. In your browser, open `http://localhost:3009/desktop-login?nonce=THE_NONCE_YOU_GOT`.
 4. Log in using Google. You should see the success message.
-5. In your terminal, poll for the token: `curl http://localhost:3000/api/desktop/token?nonce=THE_NONCE_YOU_GOT`.
+5. In your terminal, poll for the token: `curl http://localhost:3009/api/desktop/token?nonce=THE_NONCE_YOU_GOT`.
 6. You should receive a JSON object containing a JWT.
 7. Trying to use the same nonce again should result in an error. This JWT is what the desktop client will use for subsequent API calls. 
