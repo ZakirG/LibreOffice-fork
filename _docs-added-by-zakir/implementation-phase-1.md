@@ -7,7 +7,7 @@ PHASE 1: AWS Infrastructure Setup with OpenTofu
 
 Human Actions Required:
 - Create AWS account and configure AWS CLI with credentials. Done, we have AWS_ACCESS_KEY and AWS_SECRET_ACCESS_KEY in .env
-- Install OpenTofu (https://opentofu.org/docs/intro/install/)
+- Install OpenTofu (https://opentofu.org/docs/intro/install/). Done
 - Create a new directory called "libre-cloud-infra" outside the LibreOffice core directory
 - Set environment variables: export AWS_REGION=us-east-1 (or your preferred region)
 
