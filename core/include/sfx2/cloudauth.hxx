@@ -87,6 +87,12 @@ public:
     void logout();
 
     /**
+     * Clear expired authentication token silently (no user dialog)
+     * Used when API returns 401 to remove invalid stored token
+     */
+    void clearExpiredToken();
+
+    /**
      * Load stored JWT from LibreOffice configuration on startup
      */
     void loadStoredAuth();

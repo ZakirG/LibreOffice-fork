@@ -28,6 +28,7 @@ private:
     curl_slist* m_pHeaders;
     OUString m_sBaseUrl;
     OUString m_sJwtToken;
+    long m_nLastResponseCode;
 
 public:
     CloudApiClient();
@@ -44,6 +45,12 @@ public:
      * @param sToken JWT token
      */
     void setJwtToken(const OUString& sToken);
+
+    /**
+     * Get the HTTP response code from the last request
+     * @return HTTP response code (e.g., 200, 401, 404)
+     */
+    long getLastResponseCode() const;
 
     /**
      * Initialize desktop authentication by requesting a nonce

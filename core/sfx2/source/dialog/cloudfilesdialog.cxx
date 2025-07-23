@@ -169,9 +169,34 @@ void CloudFilesDialog::loadCloudDocuments()
     else
     {
         std::cerr << "*** DEBUG: getDocuments() FAILED ***" << std::endl;
-        mxStatusLabel->set_label("Failed to load cloud documents. Please try again.");
-        mDocuments.clear();
-        updateDocumentsList();
+        
+        // Check if it's a 401 authentication error (expired token)
+        long nResponseCode = mpApiClient->getLastResponseCode();
+        if (nResponseCode == 401)
+        {
+            std::cerr << "*** DEBUG: 401 authentication error - token expired ***" << std::endl;
+            
+            // Clear expired token and prompt for re-authentication
+            if (mpAuthHandler)
+            {
+                mpAuthHandler->clearExpiredToken();
+                mpApiClient = nullptr; // Clear API client reference
+            }
+            
+            mxStatusLabel->set_label("Your session has expired. Please log in again.");
+            mxLoginButton->set_visible(true);
+            mxRefreshButton->set_visible(false);
+            mDocuments.clear();
+            updateDocumentsList();
+        }
+        else
+        {
+            // Other error (network, server, etc.)
+            std::cerr << "*** DEBUG: Non-401 error, response code: " << nResponseCode << " ***" << std::endl;
+            mxStatusLabel->set_label("Failed to load cloud documents. Please check your internet connection and try again.");
+            mDocuments.clear();
+            updateDocumentsList();
+        }
     }
 
     mxRefreshButton->set_sensitive(true);

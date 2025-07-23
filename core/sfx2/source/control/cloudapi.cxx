@@ -50,6 +50,7 @@ namespace
 CloudApiClient::CloudApiClient()
     : m_pCurl(nullptr)
     , m_pHeaders(nullptr)
+    , m_nLastResponseCode(0)
 {
     // Initialize libcurl
     curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -84,6 +85,11 @@ void CloudApiClient::setBaseUrl(const OUString& sBaseUrl)
 void CloudApiClient::setJwtToken(const OUString& sToken)
 {
     m_sJwtToken = sToken;
+}
+
+long CloudApiClient::getLastResponseCode() const
+{
+    return m_nLastResponseCode;
 }
 
 bool CloudApiClient::initDesktopAuth(OUString& rsNonce, OUString& rsLoginUrl)
@@ -323,6 +329,11 @@ bool CloudApiClient::httpGet(const OUString& sUrl, OUString& rsResponse, long* p
         if (pnResponseCode)
         {
             curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, pnResponseCode);
+            m_nLastResponseCode = *pnResponseCode;
+        }
+        else
+        {
+            curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, &m_nLastResponseCode);
         }
         
         rsResponse = OUString::fromUtf8(response.data.toString());
@@ -330,6 +341,7 @@ bool CloudApiClient::httpGet(const OUString& sUrl, OUString& rsResponse, long* p
     }
     else
     {
+        m_nLastResponseCode = 0; // Network error
         SAL_WARN("sfx.control", "HTTP GET failed: " << curl_easy_strerror(res));
         return false;
     }
@@ -367,6 +379,11 @@ bool CloudApiClient::httpPost(const OUString& sUrl, const OUString& sBody, OUStr
         if (pnResponseCode)
         {
             curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, pnResponseCode);
+            m_nLastResponseCode = *pnResponseCode;
+        }
+        else
+        {
+            curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, &m_nLastResponseCode);
         }
         
         rsResponse = OUString::fromUtf8(response.data.toString());
@@ -374,6 +391,7 @@ bool CloudApiClient::httpPost(const OUString& sUrl, const OUString& sBody, OUStr
     }
     else
     {
+        m_nLastResponseCode = 0; // Network error
         SAL_WARN("sfx.control", "HTTP POST failed: " << curl_easy_strerror(res));
         return false;
     }
@@ -408,6 +426,11 @@ bool CloudApiClient::httpDelete(const OUString& sUrl, OUString& rsResponse, long
         if (pnResponseCode)
         {
             curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, pnResponseCode);
+            m_nLastResponseCode = *pnResponseCode;
+        }
+        else
+        {
+            curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, &m_nLastResponseCode);
         }
         
         rsResponse = OUString::fromUtf8(response.data.toString());
@@ -415,6 +438,7 @@ bool CloudApiClient::httpDelete(const OUString& sUrl, OUString& rsResponse, long
     }
     else
     {
+        m_nLastResponseCode = 0; // Network error
         SAL_WARN("sfx.control", "HTTP DELETE failed: " << curl_easy_strerror(res));
         return false;
     }

@@ -230,6 +230,22 @@ void CloudAuthHandler::logout()
     xBox->run();
 }
 
+void CloudAuthHandler::clearExpiredToken()
+{
+    osl::MutexGuard aGuard(m_aMutex);
+    
+    // Clear expired token silently without showing dialogs
+    m_sJwtToken.clear();
+    m_sCurrentNonce.clear();
+    m_bIsAuthenticated = false;
+    m_bAuthInProgress = false;
+
+    // Clear stored token
+    storeJwtToken("");
+    
+    SAL_WARN("sfx.control", "Expired token cleared silently");
+}
+
 void CloudAuthHandler::loadStoredAuth()
 {
     try
