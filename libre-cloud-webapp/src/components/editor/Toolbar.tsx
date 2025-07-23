@@ -32,8 +32,8 @@ function FormatButton({ format, icon, title, editor }: FormatButtonProps) {
       type="button"
       onClick={handleClick}
       title={title}
-      className={`px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 ${
-        isActive ? 'bg-blue-100 border-blue-400' : ''
+      className={`px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 text-gray-900 font-medium ${
+        isActive ? 'bg-blue-100 border-blue-400 text-blue-800' : ''
       }`}
     >
       {icon}

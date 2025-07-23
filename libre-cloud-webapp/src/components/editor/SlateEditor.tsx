@@ -66,7 +66,7 @@ export default function SlateEditor({
         <Editable
           readOnly={readOnly}
           placeholder="Start typing your document..."
-          className="outline-none min-h-[360px]"
+          className="outline-none min-h-[360px] text-gray-900"
           onKeyDown={onKeyDown}
           renderLeaf={renderLeaf}
           renderElement={renderElement}

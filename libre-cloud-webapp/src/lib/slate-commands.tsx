@@ -106,7 +106,7 @@ export const renderLeaf = ({ attributes, children, leaf }: any) => {
     );
   }
 
-  return <span {...attributes}>{children}</span>;
+  return <span {...attributes} className="text-gray-900">{children}</span>;
 };
 
 /**
@@ -116,7 +116,7 @@ export const renderElement = ({ attributes, children, element }: any) => {
   switch (element.type) {
     case 'heading':
       return (
-        <h2 {...attributes} className="text-xl font-bold mb-2">
+        <h2 {...attributes} className="text-xl font-bold mb-2 text-gray-900">
           {children}
         </h2>
       );
@@ -131,7 +131,7 @@ export const renderElement = ({ attributes, children, element }: any) => {
       );
     default:
       return (
-        <p {...attributes} className="mb-2">
+        <p {...attributes} className="mb-2 text-gray-900">
           {children}
         </p>
       );
