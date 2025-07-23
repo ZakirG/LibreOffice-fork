@@ -1,22 +1,23 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
 interface DesktopDonePageProps {
-  searchParams: {
+  searchParams: Promise<{
     nonce?: string;
-  };
+  }>;
 }
 
 export default async function DesktopDonePage({ searchParams }: DesktopDonePageProps) {
-  const session = await getServerSession(authOptions);
-  const { nonce } = searchParams;
+  const { userId } = await auth();
+  const { nonce } = await searchParams;
 
   // If no session, redirect to sign in
-  if (!session) {
-    redirect('/api/auth/signin');
+  if (!userId) {
+    redirect('/');
   }
+
+  const user = await currentUser();
 
   // If no nonce, show error
   if (!nonce) {
@@ -48,13 +49,13 @@ export default async function DesktopDonePage({ searchParams }: DesktopDonePageP
           <div className="text-4xl mb-4">✅</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Authentication Successful!</h1>
           <p className="text-gray-600 mb-4">
-            Welcome, {session.user.email}
+            Welcome, {user?.emailAddresses[0]?.emailAddress || user?.firstName || 'User'}
           </p>
           
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <p className="text-green-700 text-sm">
               You can now return to LibreOffice. Your desktop application should automatically 
-              receive the authentication token and you'll be able to save documents to the cloud.
+              receive the authentication token and you&rsquo;ll be able to save documents to the cloud.
             </p>
           </div>
 

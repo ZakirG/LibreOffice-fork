@@ -3,14 +3,7 @@ provider "aws" {
 }
 
 # Cognito User Pool Module
-module "cognito" {
-  source = "./modules/cognito-user-pool"
-  
-  project_name  = var.project_name
-  environment   = var.environment
-  callback_urls = var.callback_urls
-  logout_urls   = var.logout_urls
-}
+# Cognito module removed - using Google OAuth instead
 
 # S3 Bucket Module
 module "s3" {

@@ -19,14 +19,4 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "callback_urls" {
-  description = "List of callback URLs for Cognito"
-  type        = list(string)
-  default     = ["http://localhost:3000/api/auth/callback/cognito"]
-}
-
-variable "logout_urls" {
-  description = "List of logout URLs for Cognito"
-  type        = list(string)
-  default     = ["http://localhost:3000"]
-} 
+# Cognito variables removed - using Google OAuth instead 

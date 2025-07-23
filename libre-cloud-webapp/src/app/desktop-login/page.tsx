@@ -1,16 +1,17 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import { SignInButton } from '@clerk/nextjs';
+import Link from 'next/link';
 
 interface DesktopLoginPageProps {
-  searchParams: {
+  searchParams: Promise<{
     nonce?: string;
-  };
+  }>;
 }
 
 export default async function DesktopLoginPage({ searchParams }: DesktopLoginPageProps) {
-  const session = await getServerSession(authOptions);
-  const { nonce } = searchParams;
+  const { userId } = await auth();
+  const { nonce } = await searchParams;
 
   // If no nonce provided, show error
   if (!nonce) {
@@ -23,12 +24,12 @@ export default async function DesktopLoginPage({ searchParams }: DesktopLoginPag
             <p className="text-gray-600 mb-6">
               No authentication nonce provided. Please try again from LibreOffice.
             </p>
-            <a
+            <Link
               href="/"
               className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition-colors"
             >
               Go to Home
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -36,12 +37,37 @@ export default async function DesktopLoginPage({ searchParams }: DesktopLoginPag
   }
 
   // If already authenticated, redirect to completion page
-  if (session) {
+  if (userId) {
     redirect(`/desktop-done?nonce=${nonce}`);
   }
 
-  // Redirect to sign in with the nonce preserved
-  redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/desktop-done?nonce=${nonce}`)}`);
+  // Show sign-in page with nonce preserved
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+        <div className="text-center">
+          <div className="text-4xl mb-4">🔐</div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Desktop Authentication</h1>
+          <p className="text-gray-600 mb-6">
+            Please sign in to authenticate your LibreOffice desktop application.
+          </p>
+          
+          <SignInButton 
+            mode="modal"
+            forceRedirectUrl={`/desktop-done?nonce=${nonce}`}
+          >
+            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition-colors">
+              Sign In
+            </button>
+          </SignInButton>
+          
+          <p className="text-xs text-gray-500 mt-4">
+            Authentication nonce: <code className="bg-gray-100 px-1 rounded">{nonce}</code>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // This page will handle the nonce storage in the actual implementation

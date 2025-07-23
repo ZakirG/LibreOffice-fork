@@ -1,13 +1,12 @@
-import Link from 'next/link';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import { SignInButton } from '@clerk/nextjs';
 
 export default async function HomePage() {
-  const session = await getServerSession(authOptions);
+  const { userId } = await auth();
 
   // Redirect to dashboard if already authenticated
-  if (session) {
+  if (userId) {
     redirect('/dashboard');
   }
 
@@ -61,12 +60,11 @@ export default async function HomePage() {
               Sign in to access your cloud documents and start collaborating
             </p>
             
-            <Link
-              href="/api/auth/signin"
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200"
-            >
-              Sign In to LibreCloud
-            </Link>
+            <SignInButton mode="modal">
+              <button className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
+                Sign In to LibreCloud
+              </button>
+            </SignInButton>
           </div>
 
           {/* Footer */}

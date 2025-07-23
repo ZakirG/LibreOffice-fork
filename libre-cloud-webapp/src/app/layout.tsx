@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from "@clerk/nextjs";
+import Navigation from "@/components/navigation";
 
 export const metadata: Metadata = {
   title: "LibreCloud - Document Collaboration Platform",
@@ -12,10 +21,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased">
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body className="antialiased">
+          <header>
+            <SignedOut>
+              <SignInButton />
+              <SignUpButton />
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+          </header>
+          <Navigation />
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

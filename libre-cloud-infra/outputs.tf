@@ -1,17 +1,4 @@
-output "cognito_user_pool_id" {
-  description = "ID of the Cognito User Pool"
-  value       = module.cognito.user_pool_id
-}
-
-output "cognito_user_pool_client_id" {
-  description = "ID of the Cognito User Pool Client"
-  value       = module.cognito.user_pool_client_id
-}
-
-output "cognito_user_pool_domain" {
-  description = "Domain of the Cognito User Pool"
-  value       = module.cognito.user_pool_domain
-}
+# Cognito outputs removed - using Google OAuth instead
 
 output "s3_bucket_name" {
   description = "Name of the S3 bucket for documents"

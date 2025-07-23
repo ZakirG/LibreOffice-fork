@@ -1,20 +1,22 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
 interface DocumentPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function DocumentPage({ params }: DocumentPageProps) {
-  const session = await getServerSession(authOptions);
+  const { userId } = await auth();
 
-  if (!session) {
-    redirect('/api/auth/signin');
+  if (!userId) {
+    redirect('/');
   }
+
+  const user = await currentUser();
+  const { id } = await params;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -30,20 +32,14 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
                 ← Back to Dashboard
               </Link>
               <h1 className="text-xl font-bold text-gray-900">
-                Document: {params.id}
+                Document: {id}
               </h1>
             </div>
             
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">
-                {session.user.email}
+                {user?.emailAddresses[0]?.emailAddress || user?.firstName || 'User'}
               </span>
-              <Link
-                href="/api/auth/signout"
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm transition-colors"
-              >
-                Sign Out
-              </Link>
             </div>
           </div>
         </div>
@@ -56,7 +52,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
             <div className="text-6xl mb-4">📄</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Document Viewer</h2>
             <p className="text-gray-600 mb-6">
-              Document ID: <code className="bg-gray-100 px-2 py-1 rounded">{params.id}</code>
+              Document ID: <code className="bg-gray-100 px-2 py-1 rounded">{id}</code>
             </p>
             
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto">

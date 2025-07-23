@@ -1,14 +1,14 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
+  const { userId } = await auth();
 
-  if (!session) {
-    redirect('/api/auth/signin');
+  if (!userId) {
+    redirect('/');
   }
+
+  const user = await currentUser();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -20,14 +20,8 @@ export default async function DashboardPage() {
             
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">
-                Welcome, {session.user.email}
+                Welcome, {user?.emailAddresses[0]?.emailAddress || user?.firstName || 'User'}
               </span>
-              <Link
-                href="/api/auth/signout"
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm transition-colors"
-              >
-                Sign Out
-              </Link>
             </div>
           </div>
         </div>
@@ -50,7 +44,7 @@ export default async function DashboardPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-900 mb-2">Desktop Integration</h4>
                 <p className="text-blue-700 text-sm">
-                  Use LibreOffice Desktop with "Save to Cloud" to upload documents here
+                  Use LibreOffice Desktop with &ldquo;Save to Cloud&rdquo; to upload documents here
                 </p>
               </div>
               
