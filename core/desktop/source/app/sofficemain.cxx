@@ -57,6 +57,13 @@
 
 extern "C" int DESKTOP_DLLPUBLIC soffice_main()
 {
+    // DEBUG: Very early startup debug - this should ALWAYS create a file
+    FILE* debug_file = fopen("/tmp/libreoffice_main_startup.txt", "w");
+    if (debug_file) {
+        fprintf(debug_file, "soffice_main() called at startup!\n");
+        fclose(debug_file);
+    }
+    
 #if defined _WIN32
     // If this is a UI test, we may need to switch to a dedicated desktop
     if (o3tl::IsRunningUITest())

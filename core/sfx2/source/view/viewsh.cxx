@@ -2195,6 +2195,25 @@ void SfxViewShell::ExecMisc_Impl( SfxRequest &rReq )
         break;
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        case SID_LOGIN_TO_CLOUD:
+        {
+            SAL_WARN("sfx.debug", "=== LOGIN TO CLOUD EXECUTION ===");
+            SAL_WARN("sfx.debug", "SID_LOGIN_TO_CLOUD ExecMisc_Impl called!");
+            
+            // Forward to SfxApplication method
+            SfxApplication* pApp = SfxApplication::Get();
+            if (pApp)
+            {
+                SAL_WARN("sfx.debug", "Forwarding to SfxApplication::LoginToCloudExec_Impl");
+                pApp->LoginToCloudExec_Impl(rReq);
+            }
+            else
+            {
+                SAL_WARN("sfx.debug", "ERROR: Could not get SfxApplication instance!");
+            }
+            SAL_WARN("sfx.debug", "=== END LOGIN TO CLOUD EXECUTION ===");
+            break;
+        }
         case SID_WEBHTML:
         {
             css::uno::Reference< lang::XMultiServiceFactory > xSMGR(::comphelper::getProcessServiceFactory(), css::uno::UNO_SET_THROW);
@@ -2323,11 +2342,59 @@ void SfxViewShell::ExecMisc_Impl( SfxRequest &rReq )
 
 void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
 {
+    // VERY OBVIOUS DEBUG - Create a temporary file that we can check
+    static bool first_call = true;
+    if (first_call) {
+        FILE* debug_file = fopen("/tmp/libreoffice_getstate_called.txt", "w");
+        if (debug_file) {
+            fprintf(debug_file, "GetState_Impl was called at startup!\n");
+            fclose(debug_file);
+        }
+        first_call = false;
+    }
 
     SfxWhichIter aIter( rSet );
     SfxObjectShell *pSh = GetViewFrame().GetObjectShell();
+    SAL_WARN("sfx.debug", "Starting to iterate through SIDs in item set...");
+    SAL_WARN("sfx.debug", "SID_LOGIN_TO_CLOUD constant value: " << SID_LOGIN_TO_CLOUD);
+    SAL_WARN("sfx.debug", "SID_WEBHTML constant value: " << SID_WEBHTML);
+    
+    // DEBUG: Log calculated values to file
+    FILE* debug_file = fopen("/tmp/libreoffice_sid_values.txt", "w");
+    if (debug_file) {
+        fprintf(debug_file, "SID_LOGIN_TO_CLOUD calculated: %d\n", static_cast<int>(SID_LOGIN_TO_CLOUD));
+        fprintf(debug_file, "SID_WEBHTML calculated: %d\n", static_cast<int>(SID_WEBHTML));
+        fclose(debug_file);
+    }
+    // DEBUG: Log first few SIDs being checked
+    static int sid_counter = 0;
+    FILE* all_sids_file = fopen("/tmp/libreoffice_all_sids_checked.txt", "w");
+    
     for ( sal_uInt16 nSID = aIter.FirstWhich(); nSID; nSID = aIter.NextWhich() )
     {
+        // Log first 20 SIDs to see the pattern
+        if (all_sids_file && sid_counter < 20) {
+            fprintf(all_sids_file, "SID #%d: %d\n", sid_counter++, nSID);
+        }
+        
+        // Create a file if we find our SID
+        if (nSID == SID_LOGIN_TO_CLOUD) {
+            FILE* debug_file = fopen("/tmp/libreoffice_found_our_sid.txt", "w");
+            if (debug_file) {
+                fprintf(debug_file, "Found SID_LOGIN_TO_CLOUD: %d\n", nSID);
+                fclose(debug_file);
+            }
+        }
+        
+        // Also log when we find WebHTML for comparison
+        if (nSID == SID_WEBHTML) {
+            FILE* debug_file = fopen("/tmp/libreoffice_found_webhtml_sid.txt", "w");
+            if (debug_file) {
+                fprintf(debug_file, "Found SID_WEBHTML: %d\n", nSID);
+                fclose(debug_file);
+            }
+        }
+        
         switch ( nSID )
         {
 
@@ -2349,6 +2416,29 @@ void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
             {
                 if (pSh && pSh->isExportLocked())
                     rSet.DisableItem(nSID);
+                break;
+            }
+            case SID_LOGIN_TO_CLOUD:
+            {
+                SAL_WARN("sfx.debug", "=== LOGIN TO CLOUD STATE CHECK ===");
+                SAL_WARN("sfx.debug", "SID_LOGIN_TO_CLOUD GetState_Impl called!");
+                SAL_WARN("sfx.debug", "pSh exists: " << (pSh ? "YES" : "NO"));
+                if (pSh) {
+                    SAL_WARN("sfx.debug", "isExportLocked: " << (pSh->isExportLocked() ? "YES" : "NO"));
+                }
+                
+                // Just like SID_WEBHTML, do nothing (enabled by default)
+                // unless export is locked
+                if (pSh && pSh->isExportLocked())
+                {
+                    SAL_WARN("sfx.debug", "DISABLING LOGIN TO CLOUD - export locked");
+                    rSet.DisableItem(nSID);
+                }
+                else
+                {
+                    SAL_WARN("sfx.debug", "LOGIN TO CLOUD should be ENABLED");
+                }
+                SAL_WARN("sfx.debug", "=== END LOGIN TO CLOUD STATE CHECK ===");
                 break;
             }
             // Printer functions
@@ -2409,6 +2499,10 @@ void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
                 break;
             }
         }
+    }
+    
+    if (all_sids_file) {
+        fclose(all_sids_file);
     }
 }
 
@@ -2745,6 +2839,12 @@ SfxViewShell::SfxViewShell
 ,   maLOKDeviceFormFactor(LOKDeviceFormFactor::UNKNOWN)
 ,   mbLOKAccessibilityEnabled(false)
 {
+    // DEBUG: Constructor called - this should ALWAYS create a file
+    FILE* debug_file = fopen("/tmp/libreoffice_viewshell_constructor.txt", "w");
+    if (debug_file) {
+        fprintf(debug_file, "SfxViewShell constructor called!\n");
+        fclose(debug_file);
+    }
     SetMargin( rViewFrame.GetMargin_Impl() );
 
     SetPool( &rViewFrame.GetObjectShell()->GetPool() );

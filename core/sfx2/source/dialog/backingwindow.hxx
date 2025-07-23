@@ -50,6 +50,7 @@ class BackingWindow : public InterimItemWindow
     std::unique_ptr<weld::Button> mxOpenButton;
     std::unique_ptr<weld::ToggleButton> mxRecentButton;
     std::unique_ptr<weld::Button> mxRemoteButton;
+    std::unique_ptr<weld::Button> mxCloudFilesButton;
     std::unique_ptr<weld::ToggleButton> mxTemplateButton;
 
     std::unique_ptr<weld::Label> mxCreateLabel;
@@ -114,6 +115,7 @@ class BackingWindow : public InterimItemWindow
 
 private:
     void applyFilter();
+    void openCloudFilesDialog();
 
 public:
     explicit BackingWindow(vcl::Window* pParent);

@@ -30,11 +30,6 @@ interface Documents
     [
         ExecMethod = OpenRemoteExec_Impl ;
     ]
-    SID_LOGIN_TO_CLOUD
-    [
-        ExecMethod = LoginToCloudExec_Impl ;
-        StateMethod = LoginToCloudState_Impl ;
-    ]
     SID_SIGNPDF
     [
         ExecMethod = SignPDFExec_Impl ;

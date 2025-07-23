@@ -76,6 +76,12 @@ public:
     bool isAuthInProgress() const;
 
     /**
+     * Get the API client for making authenticated requests
+     * @return pointer to CloudApiClient, nullptr if not available
+     */
+    CloudApiClient* getApiClient() const;
+
+    /**
      * Clear stored authentication data and logout
      */
     void logout();

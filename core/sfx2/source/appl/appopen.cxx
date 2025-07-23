@@ -51,6 +51,7 @@
 #include <comphelper/synchronousdispatch.hxx>
 
 #include <svl/intitem.hxx>
+#include <svl/slstitm.hxx>
 #include <svl/stritem.hxx>
 #include <svl/eitem.hxx>
 #include <sfx2/doctempl.hxx>
@@ -74,6 +75,7 @@
 #include <sfx2/objitem.hxx>
 #include <sfx2/objsh.hxx>
 #include <svl/slstitm.hxx>
+#include <svl/voiditem.hxx>
 #include <appopen.hxx>
 #include <sfx2/request.hxx>
 #include <sfx2/sfxresid.hxx>
@@ -1169,22 +1171,31 @@ void SfxApplication::SignPDFExec_Impl(SfxRequest& rReq)
 
 void SfxApplication::LoginToCloudExec_Impl(SfxRequest& /*rReq*/)
 {
-    // Forward request to CloudAuthHandler
-    CloudAuthHandler::getInstance().startAuthentication();
+    // VERY OBVIOUS DEBUG - Create a file that we can check
+    FILE* debug_file = fopen("/tmp/libreoffice_login_clicked.txt", "w");
+    if (debug_file) {
+        fprintf(debug_file, "Login to Cloud was clicked!\n");
+        fclose(debug_file);
+    }
+    SAL_WARN("sfx.debug", "About to call CloudAuthHandler::getInstance().startAuthentication()");
+    
+    try 
+    {
+        // Forward request to CloudAuthHandler
+        CloudAuthHandler::getInstance().startAuthentication();
+        SAL_WARN("sfx.debug", "CloudAuthHandler startAuthentication completed successfully");
+    }
+    catch (const std::exception& e)
+    {
+        SAL_WARN("sfx.debug", "Exception in LoginToCloudExec_Impl: " << e.what());
+    }
+    catch (...)
+    {
+        SAL_WARN("sfx.debug", "Unknown exception in LoginToCloudExec_Impl");
+    }
+    SAL_WARN("sfx.debug", "=== END SfxApplication::LoginToCloudExec_Impl ===");
 }
 
-void SfxApplication::LoginToCloudState_Impl(SfxItemSet& rSet)
-{
-    // Enable the menu item based on authentication state
-    bool isAuthenticated = CloudAuthHandler::getInstance().isAuthenticated();
-    if (isAuthenticated)
-    {
-        rSet.Put(SfxStringItem(SID_LOGIN_TO_CLOUD, "Logout from Cloud"));
-    }
-    else
-    {
-        rSet.Put(SfxStringItem(SID_LOGIN_TO_CLOUD, "Login to Cloud"));
-    }
-}
+
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

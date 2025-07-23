@@ -70,6 +70,11 @@
     <property name="can-focus">False</property>
     <property name="icon-name">framework/res/remote-documents.png</property>
   </object>
+  <object class="GtkImage" id="cloud_files_image">
+    <property name="visible">True</property>
+    <property name="can-focus">False</property>
+    <property name="icon-name">cmd/32/symbolshapes.cloud.png</property>
+  </object>
   <object class="GtkMenu" id="recentmenu">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
@@ -136,6 +141,26 @@
                       </packing>
                     </child>
                     <child>
+                      <object class="GtkButton" id="cloud_files">
+                        <property name="label" translatable="yes" context="startcenter|cloud_files">_Cloud Files</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">True</property>
+                        <property name="margin-start">6</property>
+                        <property name="margin-end">6</property>
+                        <property name="image">cloud_files_image</property>
+                        <property name="relief">none</property>
+                        <property name="use-underline">True</property>
+                        <property name="xalign">0</property>
+                        <property name="always-show-image">True</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
+                    <child>
                       <object class="GtkButton" id="open_remote">
                         <property name="label" translatable="yes" context="startcenter|open_remote">Remote File_s</property>
                         <property name="visible">True</property>
@@ -152,7 +177,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">1</property>
+                        <property name="position">2</property>
                       </packing>
                     </child>
                     <child>
@@ -165,7 +190,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">2</property>
+                        <property name="position">3</property>
                       </packing>
                     </child>
                     <child>
@@ -185,7 +210,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">3</property>
+                        <property name="position">4</property>
                       </packing>
                     </child>
                     <child>
@@ -205,7 +230,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">4</property>
+                        <property name="position">5</property>
                       </packing>
                     </child>
                     <child>
@@ -218,7 +243,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">5</property>
+                        <property name="position">6</property>
                       </packing>
                     </child>
                     <child>
@@ -233,7 +258,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">6</property>
+                        <property name="position">7</property>
                       </packing>
                     </child>
                     <child>
@@ -253,7 +278,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">7</property>
+                        <property name="position">8</property>
                       </packing>
                     </child>
                     <child>
@@ -273,7 +298,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">8</property>
+                        <property name="position">9</property>
                       </packing>
                     </child>
                     <child>
@@ -293,7 +318,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">9</property>
+                        <property name="position">10</property>
                       </packing>
                     </child>
                     <child>
@@ -313,7 +338,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">10</property>
+                        <property name="position">11</property>
                       </packing>
                     </child>
                     <child>
@@ -333,7 +358,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">11</property>
+                        <property name="position">12</property>
                       </packing>
                     </child>
                     <child>
@@ -353,7 +378,7 @@
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">12</property>
+                        <property name="position">13</property>
                       </packing>
                     </child>
                     <child>

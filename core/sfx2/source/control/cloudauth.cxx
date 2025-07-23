@@ -54,8 +54,16 @@ CloudAuthHandler::CloudAuthHandler()
     , m_bIsAuthenticated(false)
     , m_bAuthInProgress(false)
 {
-    m_pApiClient->setBaseUrl(OUString::fromUtf8(CLOUD_API_BASE_URL));
-    loadStoredAuth();
+    try 
+    {
+        m_pApiClient->setBaseUrl(OUString::fromUtf8(CLOUD_API_BASE_URL));
+        loadStoredAuth();
+    }
+    catch (...)
+    {
+        // Ignore any initialization errors to prevent menu issues
+        SAL_WARN("sfx.control", "CloudAuthHandler initialization failed, but continuing");
+    }
 }
 
 CloudAuthHandler::~CloudAuthHandler() = default;
@@ -152,6 +160,12 @@ bool CloudAuthHandler::isAuthInProgress() const
 {
     osl::MutexGuard aGuard(m_aMutex);
     return m_bAuthInProgress;
+}
+
+CloudApiClient* CloudAuthHandler::getApiClient() const
+{
+    osl::MutexGuard aGuard(m_aMutex);
+    return m_pApiClient.get();
 }
 
 void CloudAuthHandler::logout()

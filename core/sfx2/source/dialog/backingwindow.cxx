@@ -60,6 +60,10 @@
 #include <sfx2/sfxresid.hxx>
 #include <bitmaps.hlst>
 
+#include "backingwindow.hxx"
+#include <sfx2/cloudauth.hxx>
+#include <sfx2/cloudfilesdialog.hxx>
+
 using namespace ::com::sun::star;
 using namespace ::com::sun::star::beans;
 using namespace ::com::sun::star::frame;
@@ -153,6 +157,7 @@ BackingWindow::BackingWindow(vcl::Window* i_pParent)
     , mxOpenButton(m_xBuilder->weld_button(u"open_all"_ustr))
     , mxRecentButton(m_xBuilder->weld_toggle_button(u"open_recent"_ustr))
     , mxRemoteButton(m_xBuilder->weld_button(u"open_remote"_ustr))
+    , mxCloudFilesButton(m_xBuilder->weld_button(u"cloud_files"_ustr))
     , mxTemplateButton(m_xBuilder->weld_toggle_button(u"templates_all"_ustr))
     , mxCreateLabel(m_xBuilder->weld_label(u"create_label"_ustr))
     , mxAltHelpLabel(m_xBuilder->weld_label(u"althelplabel"_ustr))
@@ -333,6 +338,8 @@ void BackingWindow::initControls()
         mxRemoteButton->set_visible(false);
     else
         mxRemoteButton->connect_clicked(LINK(this, BackingWindow, ClickHdl));
+
+    mxCloudFilesButton->connect_clicked(LINK(this, BackingWindow, ClickHdl));
 
     mxWriterAllButton->connect_clicked(LINK(this, BackingWindow, ClickHdl));
     mxDrawAllButton->connect_clicked(LINK(this, BackingWindow, ClickHdl));
@@ -580,7 +587,7 @@ IMPL_STATIC_LINK_NOARG(BackingWindow, ExtLinkClickHdl, weld::Button&, void)
         xSystemShellExecute->execute(sURL, OUString(),
             css::system::SystemShellExecuteFlags::URIS_ONLY);
     }
-    catch (const Exception&)
+    catch (const std::exception&)
     {
     }
 }
@@ -652,6 +659,10 @@ IMPL_LINK( BackingWindow, ClickHdl, weld::Button&, rButton, void )
         Reference< XDispatchProvider > xFrame( mxFrame, UNO_QUERY );
 
         dispatchURL( u".uno:Open"_ustr, OUString(), xFrame, { comphelper::makePropertyValue(u"Referer"_ustr, u"private:user"_ustr) } );
+    }
+    else if( &rButton == mxCloudFilesButton.get() )
+    {
+        openCloudFilesDialog();
     }
     else if( &rButton == mxRemoteButton.get() )
     {
@@ -810,4 +821,38 @@ void BackingWindow::clearRecentFileList()
     // tdf#166349 - reload recent documents to show pinned items
     mxAllRecentThumbnails->Reload();
 }
+
+void BackingWindow::openCloudFilesDialog()
+{
+    try
+    {
+        CloudFilesDialog aDialog(GetFrameWeld());
+        short nResult = aDialog.run();
+        
+        if (nResult == RET_OK)
+        {
+            OUString sDocumentUrl = aDialog.getSelectedDocumentUrl();
+            if (!sDocumentUrl.isEmpty())
+            {
+                // Open the selected cloud document
+                // For now, show a message with the document URL that would be opened
+                std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+                    VclMessageType::Info, VclButtonsType::Ok,
+                    "Cloud document selected: " + sDocumentUrl + "\n\n"
+                    "Document opening functionality will be implemented in the next phase."));
+                xBox->set_title("LibreCloud Document Selected");
+                xBox->run();
+            }
+        }
+    }
+    catch (const std::exception&)
+    {
+        std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+            VclMessageType::Error, VclButtonsType::Ok,
+            "Failed to open cloud files dialog. Please try again later."));
+        xBox->set_title("LibreCloud Error");
+        xBox->run();
+    }
+}
+
 /* vim:set shiftwidth=4 softtabstop=4 expandtab:*/
