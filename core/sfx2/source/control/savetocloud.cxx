@@ -8,6 +8,7 @@
  */
 
 #include <sfx2/savetocloud.hxx>
+#include <sfx2/savetoclouddlg.hxx>
 #include <sfx2/cloudauth.hxx>
 #include <sfx2/cloudapi.hxx>
 #include <sfx2/objsh.hxx>
@@ -82,6 +83,22 @@ bool SaveToCloudHandler::Execute(SfxRequest& rReq)
         return false;
     }
 
+    // Show Save to Cloud dialog to get user preferences
+    OUString sDocumentTitle = m_pObjectShell->GetTitle();
+    sfx2::SaveToCloudDialog aDlg(nullptr, sDocumentTitle);
+    
+    if (aDlg.run() != RET_OK)
+    {
+        // User cancelled the dialog
+        return false;
+    }
+    
+    const sfx2::SaveToCloudResult& aResult = aDlg.getResult();
+    if (aResult.cancelled)
+    {
+        return false;
+    }
+
     m_bOperationInProgress = true;
     
     try
@@ -89,13 +106,14 @@ bool SaveToCloudHandler::Execute(SfxRequest& rReq)
         // Show progress dialog
         showProgressDialog("Preparing document for cloud upload...");
 
-        // Get document data
+        // Get document data using user's choices
         std::cerr << "*** DEBUG: Starting document data preparation ***" << std::endl;
         SAL_WARN("sfx.control", "Starting document data preparation");
         
         std::vector<char> documentData;
-        OUString sFileName, sContentType;
-        if (!getDocumentData(documentData, sFileName, sContentType))
+        OUString sFileName = aResult.fileName;
+        OUString sContentType = aResult.contentType;
+        if (!getDocumentDataWithFormat(documentData, sFileName, sContentType, aResult.fileExtension))
         {
             std::cerr << "*** DEBUG: FAILED to prepare document data ***" << std::endl;
             SAL_WARN("sfx.control", "Failed to prepare document data");
@@ -264,6 +282,83 @@ bool SaveToCloudHandler::getDocumentData(std::vector<char>& rDocumentData, OUStr
     catch (const uno::Exception& e)
     {
         SAL_WARN("sfx.control", "Exception while preparing document data: " << e.Message);
+        return false;
+    }
+}
+
+bool SaveToCloudHandler::getDocumentDataWithFormat(std::vector<char>& rDocumentData, const OUString& rsFileName, const OUString& rsContentType, const OUString& rsExtension)
+{
+    try
+    {
+        SAL_WARN("sfx.control", "Saving document as: " << rsFileName << " with type: " << rsContentType << " extension: " << rsExtension);
+
+        // Create temporary file for saving
+        utl::TempFileNamed aTempFile;
+        aTempFile.EnableKillingFile();
+        
+        OUString sTempURL = aTempFile.GetURL();
+        
+        // Get XStorable interface
+        uno::Reference<frame::XStorable> xStorable(m_pObjectShell->GetModel(), uno::UNO_QUERY);
+        if (!xStorable.is())
+        {
+            SAL_WARN("sfx.control", "Document is not storable");
+            return false;
+        }
+
+        // Prepare save arguments
+        uno::Sequence<beans::PropertyValue> aArgs(2);
+        
+        // Set URL
+        aArgs.getArray()[0].Name = "URL";
+        aArgs.getArray()[0].Value <<= sTempURL;
+        
+        // Set filter name based on selected extension
+        aArgs.getArray()[1].Name = "FilterName";
+        OUString sFilterName;
+        
+        if (rsExtension == ".odt")
+            sFilterName = "writer8";
+        else if (rsExtension == ".ods")
+            sFilterName = "calc8";
+        else if (rsExtension == ".odp")
+            sFilterName = "impress8";
+        else if (rsExtension == ".odg")
+            sFilterName = "draw8";
+        else if (rsExtension == ".pdf")
+            sFilterName = "writer_pdf_Export"; // Default PDF export
+        else if (rsExtension == ".docx")
+            sFilterName = "MS Word 2007 XML";
+        else if (rsExtension == ".xlsx")
+            sFilterName = "Calc MS Excel 2007 XML";
+        else if (rsExtension == ".pptx")
+            sFilterName = "Impress MS PowerPoint 2007 XML";
+        else
+            sFilterName = "writer8"; // Default fallback
+            
+        aArgs.getArray()[1].Value <<= sFilterName;
+
+        // Save document to temporary file
+        xStorable->storeToURL(sTempURL, aArgs);
+
+        // Read file content
+        std::ifstream file(aTempFile.GetFileName().toUtf8().getStr(), std::ios::binary);
+        if (!file.is_open())
+        {
+            SAL_WARN("sfx.control", "Failed to open temporary file for reading");
+            return false;
+        }
+
+        // Read file content into binary vector
+        rDocumentData.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+
+        SAL_WARN("sfx.control", "Document data prepared with format, size: " << rDocumentData.size() << " bytes");
+        return true;
+    }
+    catch (const uno::Exception& e)
+    {
+        SAL_WARN("sfx.control", "Exception while preparing document data with format: " << e.Message);
         return false;
     }
 }

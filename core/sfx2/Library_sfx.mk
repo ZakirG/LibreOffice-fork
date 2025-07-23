@@ -198,6 +198,7 @@ sfx2/source/control/unoctitm \
     sfx2/source/dialog/passwd \
     sfx2/source/dialog/printopt \
     sfx2/source/dialog/recfloat \
+    sfx2/source/dialog/savetoclouddlg \
     sfx2/source/dialog/securitypage \
     sfx2/source/dialog/sfxdlg \
     sfx2/source/dialog/splitwin \

@@ -77,6 +77,16 @@ private:
     bool getDocumentData(std::vector<char>& rDocumentData, OUString& rsFileName, OUString& rsContentType);
 
     /**
+     * Get the document data with specific format
+     * @param rDocumentData [out] Document data as binary vector
+     * @param rsFileName File name with extension
+     * @param rsContentType MIME content type
+     * @param rsExtension File extension (e.g., ".odt", ".pdf")
+     * @return true if successful
+     */
+    bool getDocumentDataWithFormat(std::vector<char>& rDocumentData, const OUString& rsFileName, const OUString& rsContentType, const OUString& rsExtension);
+
+    /**
      * Upload document to cloud storage
      * @param rDocumentData Document data as binary vector
      * @param sFileName File name with extension
