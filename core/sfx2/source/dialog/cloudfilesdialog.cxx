@@ -290,9 +290,15 @@ void CloudFilesDialog::updateDocumentsList()
     
     for (const auto& doc : mDocuments)
     {
-        OUString sRow = doc.fileName + "\t" + formatDate(doc.uploadedAt) + "\t" + formatFileSize(doc.fileSize);
-        mxDocumentsList->append_text(sRow);
+        std::unique_ptr<weld::TreeIter> xIter(mxDocumentsList->make_iterator());
+        mxDocumentsList->append(xIter.get());
+        mxDocumentsList->set_text(*xIter, doc.fileName, 0);        // File Name column
+        mxDocumentsList->set_text(*xIter, formatDate(doc.uploadedAt), 1);  // Date column  
+        mxDocumentsList->set_text(*xIter, formatFileSize(doc.fileSize), 2); // Size column
     }
+    
+    // Auto-size columns to properly display all content
+    mxDocumentsList->columns_autosize();
     
     mxOpenButton->set_sensitive(false);
 }

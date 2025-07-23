@@ -155,6 +155,45 @@
                         <property name="mode">single</property>
                       </object>
                     </child>
+                    <child>
+                      <object class="GtkTreeViewColumn" id="filename_column">
+                        <property name="resizable">True</property>
+                        <property name="spacing">6</property>
+                        <property name="title" translatable="yes" context="cloudfilesdialog|filename_column">File Name</property>
+                        <child>
+                          <object class="GtkCellRendererText" id="filename_renderer"/>
+                          <attributes>
+                            <attribute name="text">0</attribute>
+                          </attributes>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkTreeViewColumn" id="date_column">
+                        <property name="resizable">True</property>
+                        <property name="spacing">6</property>
+                        <property name="title" translatable="yes" context="cloudfilesdialog|date_column">Date</property>
+                        <child>
+                          <object class="GtkCellRendererText" id="date_renderer"/>
+                          <attributes>
+                            <attribute name="text">1</attribute>
+                          </attributes>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkTreeViewColumn" id="size_column">
+                        <property name="resizable">True</property>
+                        <property name="spacing">6</property>
+                        <property name="title" translatable="yes" context="cloudfilesdialog|size_column">Size</property>
+                        <child>
+                          <object class="GtkCellRendererText" id="size_renderer"/>
+                          <attributes>
+                            <attribute name="text">2</attribute>
+                          </attributes>
+                        </child>
+                      </object>
+                    </child>
                   </object>
                 </child>
               </object>
