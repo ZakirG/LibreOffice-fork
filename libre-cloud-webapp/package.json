@@ -23,6 +23,9 @@
     "next": "15.4.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "slate": "^0.103.0",
+    "slate-history": "^0.93.0",
+    "slate-react": "^0.108.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

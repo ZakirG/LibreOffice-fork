@@ -45,6 +45,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 function getFileIcon(contentType?: string): string {
   if (!contentType) return '📄';
   
+  if (contentType === 'application/json') return '📝'; // Slate documents
   if (contentType.includes('text')) return '📝';
   if (contentType.includes('word') || contentType.includes('opendocument.text')) return '📄';
   if (contentType.includes('spreadsheet') || contentType.includes('excel')) return '📊';
@@ -54,6 +55,8 @@ function getFileIcon(contentType?: string): string {
   
   return '📄';
 }
+
+
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -471,8 +474,16 @@ export default function DashboardPage() {
 
         {/* Documents List */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Your Documents</h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => window.open(`/doc/new-${Date.now()}`, '_blank')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+              >
+                New Text Document
+              </button>
+            </div>
           </div>
           
           {loading ? (
@@ -510,6 +521,12 @@ export default function DashboardPage() {
                     </div>
                     
                     <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => window.open(`/doc/${doc.docId}`, '_blank')}
+                        className="inline-flex items-center px-3 py-1 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100"
+                      >
+                        Edit
+                      </button>
                       <button
                         onClick={() => downloadDocument(doc.docId, doc.fileName)}
                         className="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
