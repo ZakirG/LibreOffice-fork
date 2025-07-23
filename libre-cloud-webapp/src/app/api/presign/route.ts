@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAuth } from '@/lib/auth';
 import { generatePresignedUrl, isAllowedFileType, getFileExtension } from '@/lib/s3';
+import { getDocument } from '@/lib/dynamodb';
 import { logger } from '@/lib/logging';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -73,19 +74,56 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // For GET requests, validate docId
-    if (mode === 'get' && !docId) {
-      return NextResponse.json(
-        { error: 'docId is required for GET operations' },
-        { status: 400 }
-      );
+    // For GET requests, validate docId and fetch document metadata
+    let finalFileName = fileName;
+    let finalContentType = contentType;
+    
+    if (mode === 'get') {
+      if (!docId) {
+        return NextResponse.json(
+          { error: 'docId is required for GET operations' },
+          { status: 400 }
+        );
+      }
+
+      // Fetch document metadata to get original filename for proper downloads
+      try {
+        const document = await getDocument(authPayload.userId, docId);
+        if (!document) {
+          logger.warn('presign-api', 'Document not found for download', { docId }, {
+            requestId
+          });
+          return NextResponse.json(
+            { error: 'Document not found' },
+            { status: 404 }
+          );
+        }
+        
+        finalFileName = document.fileName;
+        finalContentType = document.contentType;
+        
+        logger.info('presign-api', 'Retrieved document metadata for download', {
+          docId,
+          fileName: finalFileName,
+          contentType: finalContentType
+        }, {
+          requestId
+        });
+      } catch (error) {
+        logger.error('presign-api', 'Error fetching document metadata', error, {
+          requestId
+        });
+        return NextResponse.json(
+          { error: 'Failed to fetch document metadata' },
+          { status: 500 }
+        );
+      }
     }
 
     // Generate document ID for PUT operations
     const finalDocId = mode === 'put' ? (docId || uuidv4()) : docId;
     
-    // Add file extension if not present
-    let finalFileName = fileName;
+    // Add file extension if not present (for PUT operations)
     if (mode === 'put' && fileName && contentType) {
       const extension = getFileExtension(contentType);
       if (extension && !fileName.endsWith(extension)) {
@@ -98,7 +136,7 @@ export async function POST(request: NextRequest) {
       userId: authPayload.userId,
       docId: finalDocId,
       fileName: finalFileName,
-      contentType: mode === 'put' ? contentType : undefined,
+      contentType: finalContentType,
       operation: mode,
       expiresIn: 60, // 60 seconds for security
     });

@@ -43,6 +43,11 @@ export async function generatePresignedUrl({
     const command = new GetObjectCommand({
       Bucket: awsConfig.s3BucketName,
       Key: key,
+      // Set Content-Disposition header so browser downloads with correct filename
+      // Handle special characters and spaces properly
+      ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(fileName || docId)}`,
+      // Set Content-Type header for proper file handling
+      ...(contentType && { ResponseContentType: contentType }),
     });
 
     return await getSignedUrl(s3Client!, command, { expiresIn });
