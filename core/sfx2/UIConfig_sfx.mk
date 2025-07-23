@@ -18,6 +18,7 @@ $(eval $(call gb_UIConfig_add_uifiles,sfx,\
 	sfx2/uiconfig/ui/charviewmenu \
 	sfx2/uiconfig/ui/checkin \
 	sfx2/uiconfig/ui/classificationbox \
+	sfx2/uiconfig/ui/cloudfilesdialog \
 	sfx2/uiconfig/ui/cmisinfopage \
 	sfx2/uiconfig/ui/cmisline \
 	sfx2/uiconfig/ui/commandpopup \
