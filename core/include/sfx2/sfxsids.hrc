@@ -134,6 +134,7 @@ class SvxZoomItem;
 #define SID_OPENTEMPLATE                    (SID_SFX_START + 594)
 #define SID_SAVEASDOC                       TypedWhichId<SfxStringItem>(SID_SFX_START + 502)
 #define SID_SAVEASREMOTE                    (SID_SFX_START + 516)
+#define SID_SAVETOCLOUD                     (SID_SFX_START + 521)
 #define SID_SAVESIMPLE                      (SID_SFX_START + 518)
 #define SID_SIGNPDF                         TypedWhichId<SfxBoolItem>(SID_SFX_START + 519)
 // this is either SfxBoolItem or SfxStringItem

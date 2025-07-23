@@ -6029,3 +6029,22 @@ SfxVoidItem InvertBackground FN_INVERT_BACKGROUND
 
     GroupId = SfxGroupId::Application;
 ]
+
+SfxVoidItem SaveToCloud SID_SAVETOCLOUD
+()
+[
+    AutoUpdate = FALSE,
+    FastCall = FALSE,
+    ReadOnlyDoc = TRUE,
+    ViewerApp = FALSE,
+    Toggle = FALSE,
+    Container = TRUE,
+    RecordAbsolute = FALSE,
+    RecordPerSet;
+    Asynchron;
+
+    AccelConfig = TRUE,
+    MenuConfig = TRUE,
+    ToolBoxConfig = TRUE,
+    GroupId = SfxGroupId::Document;
+]

@@ -169,8 +169,9 @@ $(eval $(call gb_Library_add_exception_objects,sfx,\
     sfx2/source/control/charmapcontrol \
     sfx2/source/control/charwin \
     sfx2/source/control/cloudauth \
-    sfx2/source/control/cloudapi \
-    sfx2/source/control/unoctitm \
+sfx2/source/control/cloudapi \
+sfx2/source/control/savetocloud \
+sfx2/source/control/unoctitm \
     sfx2/source/devtools/DevelopmentToolChildWindow \
     sfx2/source/devtools/DevelopmentToolDockingWindow \
     sfx2/source/devtools/DocumentModelTreeHandler \

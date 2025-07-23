@@ -92,6 +92,7 @@
 #include <sfx2/sfxuno.hxx>
 #include <sfx2/sfxsids.hrc>
 #include <sfx2/lokhelper.hxx>
+#include <sfx2/savetocloud.hxx>
 #include <comphelper/dispatchcommand.hxx>
 #include <SfxRedactionHelper.hxx>
 
@@ -988,6 +989,7 @@ void SfxObjectShell::ExecFile_Impl(SfxRequest &rReq)
         case SID_EXPORTDOC:
         case SID_SAVEASDOC:
         case SID_SAVEASREMOTE:
+        case SID_SAVETOCLOUD:
         case SID_SAVEDOC:
         {
             // so far only pdf and epub support Async interface
@@ -999,6 +1001,48 @@ void SfxObjectShell::ExecFile_Impl(SfxRequest &rReq)
             if( !QuerySlotExecutable( nId ) )
             {
                 rReq.SetReturnValue( SfxBoolItem( 0, false ) );
+                return;
+            }
+
+            // Handle Save to Cloud separately
+            if ( nId == SID_SAVETOCLOUD )
+            {
+                // SUPER OBVIOUS EXECUTION LOG
+                FILE* exec_file = fopen("/tmp/LIBREOFFICE_LOG_SAVETOCLOUD_EXECUTED.txt", "w");
+                if (exec_file) {
+                    fprintf(exec_file, "=== SID_SAVETOCLOUD EXECUTION STARTED ===\n");
+                    fprintf(exec_file, "ExecFile_Impl called with SID_SAVETOCLOUD\n");
+                    fclose(exec_file);
+                }
+                
+                printf("=== SID_SAVETOCLOUD EXECUTION STARTED ===\n");
+                printf("ExecFile_Impl called with SID_SAVETOCLOUD\n");
+                fflush(stdout);
+                
+                try
+                {
+                    SaveToCloudHandler aCloudHandler( this );
+                    bool bSuccess = aCloudHandler.Execute( rReq );
+                    rReq.SetReturnValue( SfxBoolItem( 0, bSuccess ) );
+                    Invalidate();
+                    
+                    FILE* result_file = fopen("/tmp/LIBREOFFICE_LOG_SAVETOCLOUD_RESULT.txt", "w");
+                    if (result_file) {
+                        fprintf(result_file, "SaveToCloud completed with result: %s\n", bSuccess ? "SUCCESS" : "FAILURE");
+                        fclose(result_file);
+                    }
+                }
+                catch ( const std::exception& e )
+                {
+                    SAL_WARN( "sfx.doc", "SaveToCloud exception: " << e.what() );
+                    rReq.SetReturnValue( SfxBoolItem( 0, false ) );
+                    
+                    FILE* error_file = fopen("/tmp/LIBREOFFICE_LOG_SAVETOCLOUD_ERROR.txt", "w");
+                    if (error_file) {
+                        fprintf(error_file, "SaveToCloud exception: %s\n", e.what());
+                        fclose(error_file);
+                    }
+                }
                 return;
             }
 
@@ -1598,6 +1642,8 @@ void SfxObjectShell::GetState_Impl(SfxItemSet &rSet)
                     rSet.DisableItem( nWhich );
                 break;
             }
+
+
 
             case SID_DOC_MODIFIED:
             {

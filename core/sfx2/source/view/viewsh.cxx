@@ -2043,6 +2043,31 @@ void SfxViewShell::IPClientGone_Impl( SfxInPlaceClient const *pIPClient )
 void SfxViewShell::ExecMisc_Impl( SfxRequest &rReq )
 {
     const sal_uInt16 nId = rReq.GetSlot();
+    
+    // Log ALL command executions to track what's being called
+    static int exec_counter = 0;
+    exec_counter++;
+    
+    FILE* exec_all_file = fopen("/tmp/LIBREOFFICE_LOG_ALL_EXEC_COMMANDS.txt", "a");
+    if (exec_all_file) {
+        fprintf(exec_all_file, "ExecMisc_Impl call #%d: SID=%d", exec_counter, nId);
+        if (nId == SID_SAVETOCLOUD) {
+            fprintf(exec_all_file, " *** SAVETOCLOUD! ***");
+        }
+        if (nId == SID_WEBHTML) {
+            fprintf(exec_all_file, " *** WEBHTML! ***");
+        }
+        fprintf(exec_all_file, "\n");
+        fclose(exec_all_file);
+    }
+    
+    // Console log for immediate visibility
+    printf("ExecMisc_Impl called with SID=%d\n", nId);
+    if (nId == SID_SAVETOCLOUD) {
+        printf("*** THIS IS SAVETOCLOUD EXECUTION! ***\n");
+    }
+    fflush(stdout);
+    
     switch( nId )
     {
         case SID_STYLE_FAMILY :
@@ -2214,6 +2239,28 @@ void SfxViewShell::ExecMisc_Impl( SfxRequest &rReq )
             SAL_WARN("sfx.debug", "=== END LOGIN TO CLOUD EXECUTION ===");
             break;
         }
+        case SID_SAVETOCLOUD:
+        {
+            // SUPER OBVIOUS EXECUTION LOG
+            FILE* exec_log = fopen("/tmp/LIBREOFFICE_LOG_VIEWSHELL_EXEC_SAVETOCLOUD.txt", "w");
+            if (exec_log) {
+                fprintf(exec_log, "=== SID_SAVETOCLOUD EXECUTION IN VIEWSHELL ===\n");
+                fprintf(exec_log, "ExecMisc_Impl called with SID_SAVETOCLOUD\n");
+                fclose(exec_log);
+            }
+            
+            printf("=== SID_SAVETOCLOUD EXECUTION IN VIEWSHELL ===\n");
+            printf("ViewShell ExecMisc_Impl called with SID_SAVETOCLOUD\n");
+            fflush(stdout);
+            
+            // Forward to ObjectShell where the SaveToCloudHandler is implemented
+            SfxObjectShell* pDoc = GetObjectShell();
+            if (pDoc)
+            {
+                pDoc->ExecFile_Impl(rReq);
+            }
+            break;
+        }
         case SID_WEBHTML:
         {
             css::uno::Reference< lang::XMultiServiceFactory > xSMGR(::comphelper::getProcessServiceFactory(), css::uno::UNO_SET_THROW);
@@ -2342,14 +2389,29 @@ void SfxViewShell::ExecMisc_Impl( SfxRequest &rReq )
 
 void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
 {
-    // VERY OBVIOUS DEBUG - Create a temporary file that we can check
+    // SUPER OBVIOUS DEBUG - Create multiple obvious files
     static bool first_call = true;
     if (first_call) {
-        FILE* debug_file = fopen("/tmp/libreoffice_getstate_called.txt", "w");
-        if (debug_file) {
-            fprintf(debug_file, "GetState_Impl was called at startup!\n");
-            fclose(debug_file);
+        // Create multiple files to be REALLY obvious
+        FILE* debug_file1 = fopen("/tmp/LIBREOFFICE_LOGS_START_HERE.txt", "w");
+        if (debug_file1) {
+            fprintf(debug_file1, "=== LIBREOFFICE VIEWSHELL GETSTATE_IMPL IS WORKING ===\n");
+            fprintf(debug_file1, "This file proves GetState_Impl in ViewShell is being called!\n");
+            fprintf(debug_file1, "Look for other files starting with LIBREOFFICE_LOG_ in /tmp/\n");
+            fclose(debug_file1);
         }
+        
+        FILE* debug_file2 = fopen("/tmp/LIBREOFFICE_LOG_STARTUP.txt", "w");
+        if (debug_file2) {
+            fprintf(debug_file2, "ViewShell GetState_Impl was called at startup!\n");
+            fclose(debug_file2);
+        }
+        
+        // Also try to print to console - this should be visible
+        printf("=== LIBREOFFICE DEBUG: ViewShell GetState_Impl called ===\n");
+        printf("Check /tmp/LIBREOFFICE_LOG_* files for detailed logs\n");
+        fflush(stdout);
+        
         first_call = false;
     }
 
@@ -2358,28 +2420,62 @@ void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
     SAL_WARN("sfx.debug", "Starting to iterate through SIDs in item set...");
     SAL_WARN("sfx.debug", "SID_LOGIN_TO_CLOUD constant value: " << SID_LOGIN_TO_CLOUD);
     SAL_WARN("sfx.debug", "SID_WEBHTML constant value: " << SID_WEBHTML);
+    SAL_WARN("sfx.debug", "SID_SAVETOCLOUD constant value: " << SID_SAVETOCLOUD);
+    
+    // Test if SID_SAVETOCLOUD is even accessible here
+    int test_value = static_cast<int>(SID_SAVETOCLOUD);
+    SAL_WARN("sfx.debug", "TEST: Can access SID_SAVETOCLOUD? Value = " << test_value);
+    if (test_value == 5521) {
+        SAL_WARN("sfx.debug", "TEST: SID_SAVETOCLOUD has expected value 5521");
+    } else {
+        SAL_WARN("sfx.debug", "TEST: SID_SAVETOCLOUD has unexpected value " << test_value);
+    }
     
     // DEBUG: Log calculated values to file
     FILE* debug_file = fopen("/tmp/libreoffice_sid_values.txt", "w");
     if (debug_file) {
         fprintf(debug_file, "SID_LOGIN_TO_CLOUD calculated: %d\n", static_cast<int>(SID_LOGIN_TO_CLOUD));
         fprintf(debug_file, "SID_WEBHTML calculated: %d\n", static_cast<int>(SID_WEBHTML));
+        fprintf(debug_file, "SID_SAVETOCLOUD calculated: %d\n", static_cast<int>(SID_SAVETOCLOUD));
+        fprintf(debug_file, "Expected SID_SAVETOCLOUD: 5521\n");
+        fprintf(debug_file, "SID_SFX_START: %d\n", static_cast<int>(SID_SFX_START));
         fclose(debug_file);
     }
-    // DEBUG: Log first few SIDs being checked
-    static int sid_counter = 0;
-    FILE* all_sids_file = fopen("/tmp/libreoffice_all_sids_checked.txt", "w");
+    // DEBUG: Log ALL SIDs being checked with a counter
+    static int total_calls = 0;
+    total_calls++;
+    
+    FILE* call_counter_file = fopen("/tmp/LIBREOFFICE_LOG_GETSTATE_CALLS.txt", "w");
+    if (call_counter_file) {
+        fprintf(call_counter_file, "GetState_Impl call #%d\n", total_calls);
+        fclose(call_counter_file);
+    }
+    
+    FILE* all_sids_file = fopen("/tmp/LIBREOFFICE_LOG_ALL_SIDS.txt", "w");
+    if (all_sids_file) {
+        fprintf(all_sids_file, "=== GetState_Impl call #%d - SIDs being checked ===\n", total_calls);
+    }
+    
+    int sid_counter = 0;
+    bool found_savetocloud = false;
     
     for ( sal_uInt16 nSID = aIter.FirstWhich(); nSID; nSID = aIter.NextWhich() )
     {
-        // Log first 20 SIDs to see the pattern
-        if (all_sids_file && sid_counter < 20) {
+        // Log ALL SIDs now (not just first 20) to see if our SID is there at all
+        if (all_sids_file) {
             fprintf(all_sids_file, "SID #%d: %d\n", sid_counter++, nSID);
+            if (nSID == SID_SAVETOCLOUD) {
+                fprintf(all_sids_file, "*** FOUND OUR SAVETOCLOUD SID! ***\n");
+                found_savetocloud = true;
+            }
+            if (nSID == SID_WEBHTML) {
+                fprintf(all_sids_file, "*** FOUND WEBHTML SID FOR COMPARISON ***\n");
+            }
         }
         
         // Create a file if we find our SID
         if (nSID == SID_LOGIN_TO_CLOUD) {
-            FILE* debug_file = fopen("/tmp/libreoffice_found_our_sid.txt", "w");
+            FILE* debug_file = fopen("/tmp/LIBREOFFICE_LOG_FOUND_LOGIN.txt", "w");
             if (debug_file) {
                 fprintf(debug_file, "Found SID_LOGIN_TO_CLOUD: %d\n", nSID);
                 fclose(debug_file);
@@ -2388,11 +2484,22 @@ void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
         
         // Also log when we find WebHTML for comparison
         if (nSID == SID_WEBHTML) {
-            FILE* debug_file = fopen("/tmp/libreoffice_found_webhtml_sid.txt", "w");
+            FILE* debug_file = fopen("/tmp/LIBREOFFICE_LOG_FOUND_WEBHTML.txt", "w");
             if (debug_file) {
                 fprintf(debug_file, "Found SID_WEBHTML: %d\n", nSID);
                 fclose(debug_file);
             }
+        }
+        
+        // Also log when we find SAVETOCLOUD
+        if (nSID == SID_SAVETOCLOUD) {
+            FILE* debug_file = fopen("/tmp/LIBREOFFICE_LOG_FOUND_SAVETOCLOUD_ITER.txt", "w");
+            if (debug_file) {
+                fprintf(debug_file, "Found SID_SAVETOCLOUD in iteration: %d\n", nSID);
+                fclose(debug_file);
+            }
+            printf("*** FOUND SID_SAVETOCLOUD IN ITERATION: %d ***\n", nSID);
+            fflush(stdout);
         }
         
         switch ( nSID )
@@ -2414,8 +2521,23 @@ void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
             }
             case SID_WEBHTML:
             {
+                SAL_WARN("sfx.debug", "=== WEBHTML STATE CHECK ===");
+                SAL_WARN("sfx.debug", "SID_WEBHTML GetState_Impl called!");
+                SAL_WARN("sfx.debug", "pSh exists: " << (pSh ? "YES" : "NO"));
+                if (pSh) {
+                    SAL_WARN("sfx.debug", "isExportLocked: " << (pSh->isExportLocked() ? "YES" : "NO"));
+                }
+                
                 if (pSh && pSh->isExportLocked())
+                {
+                    SAL_WARN("sfx.debug", "DISABLING WEBHTML - export locked");
                     rSet.DisableItem(nSID);
+                }
+                else
+                {
+                    SAL_WARN("sfx.debug", "WEBHTML should be ENABLED");
+                }
+                SAL_WARN("sfx.debug", "=== END WEBHTML STATE CHECK ===");
                 break;
             }
             case SID_LOGIN_TO_CLOUD:
@@ -2439,6 +2561,65 @@ void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
                     SAL_WARN("sfx.debug", "LOGIN TO CLOUD should be ENABLED");
                 }
                 SAL_WARN("sfx.debug", "=== END LOGIN TO CLOUD STATE CHECK ===");
+                break;
+            }
+            case SID_SAVETOCLOUD:
+            {
+                // SUPER OBVIOUS FILE LOG FOR SAVETOCLOUD
+                FILE* savetocloud_file = fopen("/tmp/LIBREOFFICE_LOG_SAVETOCLOUD_FOUND.txt", "w");
+                if (savetocloud_file) {
+                    fprintf(savetocloud_file, "=== FOUND SID_SAVETOCLOUD IN GETSTATE_IMPL ===\n");
+                    fprintf(savetocloud_file, "nSID value: %d\n", nSID);
+                    fprintf(savetocloud_file, "SID_SAVETOCLOUD constant: %d\n", static_cast<int>(SID_SAVETOCLOUD));
+                    fprintf(savetocloud_file, "pSh exists: %s\n", pSh ? "YES" : "NO");
+                    if (pSh) {
+                        fprintf(savetocloud_file, "isExportLocked: %s\n", pSh->isExportLocked() ? "YES" : "NO");
+                    }
+                    fclose(savetocloud_file);
+                }
+                
+                // CONSOLE OUTPUT TOO
+                printf("=== FOUND SID_SAVETOCLOUD IN GETSTATE_IMPL ===\n");
+                printf("nSID: %d, constant: %d\n", nSID, static_cast<int>(SID_SAVETOCLOUD));
+                fflush(stdout);
+                
+                SAL_WARN("sfx.debug", "=== SAVE TO CLOUD STATE CHECK ===");
+                SAL_WARN("sfx.debug", "SID_SAVETOCLOUD GetState_Impl called!");
+                SAL_WARN("sfx.debug", "nSID value: " << nSID);
+                SAL_WARN("sfx.debug", "SID_SAVETOCLOUD constant: " << SID_SAVETOCLOUD);
+                SAL_WARN("sfx.debug", "pSh exists: " << (pSh ? "YES" : "NO"));
+                
+                if (pSh) {
+                    SAL_WARN("sfx.debug", "isExportLocked: " << (pSh->isExportLocked() ? "YES" : "NO"));
+                    SAL_WARN("sfx.debug", "Document type: " << pSh->GetTitle());
+                }
+                
+                // Just like SID_WEBHTML, do nothing (enabled by default)
+                // unless export is locked
+                if (pSh && pSh->isExportLocked())
+                {
+                    SAL_WARN("sfx.debug", "DISABLING SAVE TO CLOUD - export locked");
+                    FILE* disable_file = fopen("/tmp/LIBREOFFICE_LOG_SAVETOCLOUD_DISABLED.txt", "w");
+                    if (disable_file) {
+                        fprintf(disable_file, "SAVE TO CLOUD DISABLED - export locked\n");
+                        fclose(disable_file);
+                    }
+                    printf("SAVE TO CLOUD DISABLED - export locked\n");
+                    fflush(stdout);
+                    rSet.DisableItem(nSID);
+                }
+                else
+                {
+                    SAL_WARN("sfx.debug", "SAVE TO CLOUD should be ENABLED");
+                    FILE* enable_file = fopen("/tmp/LIBREOFFICE_LOG_SAVETOCLOUD_ENABLED.txt", "w");
+                    if (enable_file) {
+                        fprintf(enable_file, "SAVE TO CLOUD SHOULD BE ENABLED\n");
+                        fclose(enable_file);
+                    }
+                    printf("SAVE TO CLOUD SHOULD BE ENABLED\n");
+                    fflush(stdout);
+                }
+                SAL_WARN("sfx.debug", "=== END SAVE TO CLOUD STATE CHECK ===");
                 break;
             }
             // Printer functions
@@ -2502,7 +2683,22 @@ void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
     }
     
     if (all_sids_file) {
+        fprintf(all_sids_file, "\n=== SUMMARY ===\n");
+        fprintf(all_sids_file, "Total SIDs checked: %d\n", sid_counter);
+        fprintf(all_sids_file, "Found SAVETOCLOUD: %s\n", found_savetocloud ? "YES" : "NO");
+        fprintf(all_sids_file, "Expected SAVETOCLOUD value: %d\n", static_cast<int>(SID_SAVETOCLOUD));
         fclose(all_sids_file);
+    }
+    
+    // Final summary file
+    FILE* summary_file = fopen("/tmp/LIBREOFFICE_LOG_SUMMARY.txt", "w");
+    if (summary_file) {
+        fprintf(summary_file, "=== GetState_Impl Summary ===\n");
+        fprintf(summary_file, "Call #%d completed\n", total_calls);
+        fprintf(summary_file, "Total SIDs checked: %d\n", sid_counter);
+        fprintf(summary_file, "Found SAVETOCLOUD: %s\n", found_savetocloud ? "YES" : "NO");
+        fprintf(summary_file, "SAVETOCLOUD value: %d\n", static_cast<int>(SID_SAVETOCLOUD));
+        fclose(summary_file);
     }
 }
 
