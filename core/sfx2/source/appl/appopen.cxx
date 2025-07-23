@@ -78,6 +78,7 @@
 #include <sfx2/request.hxx>
 #include <sfx2/sfxresid.hxx>
 #include <sfx2/viewsh.hxx>
+#include <sfx2/cloudauth.hxx>
 #include <sfx2/strings.hrc>
 #include <sfx2/viewfrm.hxx>
 #include <sfx2/sfxuno.hxx>
@@ -1164,6 +1165,26 @@ void SfxApplication::SignPDFExec_Impl(SfxRequest& rReq)
 {
     rReq.AppendItem(SfxBoolItem(SID_SIGNPDF, true));
     GetDispatcher_Impl()->Execute(SID_OPENDOC, SfxCallMode::SYNCHRON, *rReq.GetArgs());
+}
+
+void SfxApplication::LoginToCloudExec_Impl(SfxRequest& /*rReq*/)
+{
+    // Forward request to CloudAuthHandler
+    CloudAuthHandler::getInstance().startAuthentication();
+}
+
+void SfxApplication::LoginToCloudState_Impl(SfxItemSet& rSet)
+{
+    // Enable the menu item based on authentication state
+    bool isAuthenticated = CloudAuthHandler::getInstance().isAuthenticated();
+    if (isAuthenticated)
+    {
+        rSet.Put(SfxStringItem(SID_LOGIN_TO_CLOUD, "Logout from Cloud"));
+    }
+    else
+    {
+        rSet.Put(SfxStringItem(SID_LOGIN_TO_CLOUD, "Login to Cloud"));
+    }
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

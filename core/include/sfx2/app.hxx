@@ -197,6 +197,8 @@ public:
     SAL_DLLPRIVATE void         OpenDocExec_Impl(SfxRequest &);
     SAL_DLLPRIVATE void         OpenRemoteExec_Impl(SfxRequest &);
     SAL_DLLPRIVATE void         SignPDFExec_Impl(SfxRequest&);
+    SAL_DLLPRIVATE void         LoginToCloudExec_Impl(SfxRequest&);
+    SAL_DLLPRIVATE void         LoginToCloudState_Impl(SfxItemSet&);
     SAL_DLLPRIVATE void         MiscExec_Impl(SfxRequest &);
     SAL_DLLPRIVATE void         MiscState_Impl(SfxItemSet &);
     SAL_DLLPRIVATE static void  PropExec_Impl(SfxRequest const &);

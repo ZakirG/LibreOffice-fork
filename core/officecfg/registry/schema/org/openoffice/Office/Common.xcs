@@ -7023,5 +7023,16 @@
         <value>0</value>
       </prop>
     </group>
+    <group oor:name="Cloud">
+      <info>
+        <desc>Contains settings for cloud-based document storage and authentication.</desc>
+      </info>
+      <prop oor:name="JwtToken" oor:type="xs:string" oor:nillable="false">
+        <info>
+          <desc>Stores the JWT token for LibreCloud authentication. This token is encrypted and stored securely.</desc>
+        </info>
+        <value/>
+      </prop>
+    </group>
   </component>
 </oor:component-schema>
