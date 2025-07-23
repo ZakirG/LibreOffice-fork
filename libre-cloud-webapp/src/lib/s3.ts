@@ -19,6 +19,10 @@ export async function generatePresignedUrl({
   operation,
   expiresIn = 60, // 1 minute default
 }: PresignedUrlOptions): Promise<string> {
+  if (!s3Client) {
+    throw new Error('S3 client not configured. Please check your AWS credentials.');
+  }
+  
   const key = `${userId}/${docId}`;
 
   if (operation === 'put') {
@@ -34,18 +38,22 @@ export async function generatePresignedUrl({
       },
     });
 
-    return await getSignedUrl(s3Client, command, { expiresIn });
+    return await getSignedUrl(s3Client!, command, { expiresIn });
   } else {
     const command = new GetObjectCommand({
       Bucket: awsConfig.s3BucketName,
       Key: key,
     });
 
-    return await getSignedUrl(s3Client, command, { expiresIn });
+    return await getSignedUrl(s3Client!, command, { expiresIn });
   }
 }
 
 export async function deleteS3Object(userId: string, docId: string): Promise<void> {
+  if (!s3Client) {
+    throw new Error('S3 client not configured. Please check your AWS credentials.');
+  }
+  
   const key = `${userId}/${docId}`;
   
   const command = new DeleteObjectCommand({

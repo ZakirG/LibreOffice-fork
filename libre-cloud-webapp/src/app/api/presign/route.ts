@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateDesktopJWT } from '@/lib/jwt';
+import { validateAuth } from '@/lib/auth';
 import { generatePresignedUrl, isAllowedFileType, getFileExtension } from '@/lib/s3';
 import { logger } from '@/lib/logging';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,8 +14,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Validate JWT token
-    const jwtPayload = validateDesktopJWT(request);
-    if (!jwtPayload) {
+    const authPayload = await validateAuth(request);
+    if (!authPayload) {
       logger.warn('presign-api', 'Invalid JWT token in presign request', undefined, {
         requestId
       });
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     // Generate presigned URL
     const presignedUrl = await generatePresignedUrl({
-      userId: jwtPayload.userId,
+      userId: authPayload.userId,
       docId: finalDocId,
       fileName: finalFileName,
       contentType: mode === 'put' ? contentType : undefined,
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     });
 
     logger.info('presign-api', 'Presigned URL generated successfully', {
-      userId: jwtPayload.userId,
+      userId: authPayload.userId,
       docId: finalDocId,
       mode,
       fileName: finalFileName
