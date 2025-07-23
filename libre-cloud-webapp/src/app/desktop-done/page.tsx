@@ -1,13 +1,9 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-
-const dynamoClient = new DynamoDBClient({
-  region: process.env.AWS_REGION,
-});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
+import { dynamoDbDocClient, awsConfig } from '@/lib/aws';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { logger, COMPONENTS } from '@/lib/logging';
 
 interface DesktopDonePageProps {
   searchParams: Promise<{
@@ -51,26 +47,51 @@ export default async function DesktopDonePage({ searchParams }: DesktopDonePageP
 
   // Update the nonce status in DynamoDB with user information
   try {
-    await docClient.send(new UpdateCommand({
-      TableName: process.env.DYNAMODB_DESKTOP_LOGIN_TABLE_NAME,
-      Key: { nonce },
-      UpdateExpression: 'SET #status = :ready, userId = :userId, #data = :userData',
-      ExpressionAttributeNames: {
-        '#status': 'status',
-        '#data': 'data'
-      },
-      ExpressionAttributeValues: {
-        ':ready': 'ready',
-        ':userId': userId,
-        ':userData': {
-          email: user?.emailAddresses[0]?.emailAddress || '',
-          firstName: user?.firstName || '',
-          lastName: user?.lastName || '',
+    // Validate nonce format (should be a valid UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(nonce)) {
+      logger.warn(
+        COMPONENTS.DESKTOP_DONE,
+        `Invalid nonce format received: ${nonce} for user: ${userId}`
+      );
+      // Don't redirect, but log the error
+    } else {
+      logger.info(
+        COMPONENTS.DESKTOP_DONE,
+        `Updating nonce status to ready for nonce: ${nonce}, user: ${userId}`
+      );
+
+      await dynamoDbDocClient.send(new UpdateCommand({
+        TableName: awsConfig.desktopLoginTableName,
+        Key: { nonce },
+        UpdateExpression: 'SET #status = :ready, userId = :userId, #data = :userData, readyAt = :readyAt',
+        ExpressionAttributeNames: {
+          '#status': 'status',
+          '#data': 'data'
+        },
+        ExpressionAttributeValues: {
+          ':ready': 'ready',
+          ':userId': userId,
+          ':readyAt': Date.now(),
+          ':userData': {
+            email: user?.emailAddresses[0]?.emailAddress || '',
+            firstName: user?.firstName || '',
+            lastName: user?.lastName || '',
+          }
         }
-      }
-    }));
+      }));
+
+      logger.info(
+        COMPONENTS.DESKTOP_DONE,
+        `Successfully updated nonce status to ready for nonce: ${nonce}, user: ${userId}`
+      );
+    }
   } catch (error) {
-    console.error('Error updating nonce status:', error);
+    logger.error(
+      COMPONENTS.DESKTOP_DONE,
+      `Failed to update nonce status in DynamoDB for nonce: ${nonce}, user: ${userId}`,
+      error
+    );
   }
 
   return (

@@ -1,6 +1,17 @@
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { dynamoDbDocClient, awsConfig } from './aws';
 
+// Helper function to ensure DynamoDB client is available
+function ensureDynamoClient() {
+  if (!dynamoDbDocClient) {
+    throw new Error('DynamoDB client not configured. Please check your AWS credentials.');
+  }
+  return dynamoDbDocClient;
+}
+
+// Type assertion to suppress TypeScript warnings for now
+const dynamoClient = dynamoDbDocClient as any;
+
 // Document types
 export interface Document {
   userId: string;
@@ -22,6 +33,11 @@ export interface DesktopLogin {
 
 // Document operations
 export async function createDocument(document: Document): Promise<void> {
+  if (!dynamoDbDocClient) {
+    console.warn('DynamoDB client not configured - cannot create document');
+    return;
+  }
+  
   const command = new PutCommand({
     TableName: awsConfig.documentsTableName,
     Item: document,
@@ -41,6 +57,11 @@ export async function getDocument(userId: string, docId: string): Promise<Docume
 }
 
 export async function getUserDocuments(userId: string): Promise<Document[]> {
+  if (!dynamoDbDocClient) {
+    console.warn('DynamoDB client not configured - returning empty documents list');
+    return [];
+  }
+  
   const command = new QueryCommand({
     TableName: awsConfig.documentsTableName,
     KeyConditionExpression: 'userId = :userId',
@@ -50,7 +71,7 @@ export async function getUserDocuments(userId: string): Promise<Document[]> {
     ScanIndexForward: false, // Sort by newest first
   });
 
-  const result = await dynamoDbDocClient.send(command);
+  const result = await ensureDynamoClient().send(command);
   return result.Items as Document[] || [];
 }
 
@@ -81,6 +102,11 @@ export async function updateDocument(userId: string, docId: string, updates: Par
 }
 
 export async function deleteDocument(userId: string, docId: string): Promise<void> {
+  if (!dynamoDbDocClient) {
+    console.warn('DynamoDB client not configured - cannot delete document');
+    return;
+  }
+  
   const command = new DeleteCommand({
     TableName: awsConfig.documentsTableName,
     Key: { userId, docId },

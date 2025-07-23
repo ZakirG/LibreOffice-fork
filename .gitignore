@@ -205,6 +205,9 @@ core/generated/prisma
 
 .env
 .env.local
+core/.env.local
+core/.env
+
 
 .terraform/
 *.tfstate

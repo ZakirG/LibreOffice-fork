@@ -5,25 +5,28 @@ import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-
 
 const region = process.env.AWS_REGION || 'us-east-1';
 
+// Check if AWS credentials are available
+const hasAwsCredentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+
 // DynamoDB Client
-export const dynamoDbClient = new DynamoDBClient({
+export const dynamoDbClient = hasAwsCredentials ? new DynamoDBClient({
   region,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
-});
+}) : null;
 
-export const dynamoDbDocClient = DynamoDBDocumentClient.from(dynamoDbClient);
+export const dynamoDbDocClient = dynamoDbClient ? DynamoDBDocumentClient.from(dynamoDbClient) : null;
 
 // S3 Client
-export const s3Client = new S3Client({
+export const s3Client = hasAwsCredentials ? new S3Client({
   region,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
-});
+}) : null;
 
 // Cognito Client
 export const cognitoClient = new CognitoIdentityProviderClient({

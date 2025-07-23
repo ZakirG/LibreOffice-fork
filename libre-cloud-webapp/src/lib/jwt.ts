@@ -27,6 +27,15 @@ export function generateDesktopJWT(userId: string, email: string): string {
 
 export function verifyDesktopJWT(token: string): DesktopJWTPayload | null {
   try {
+    // First, try to decode without verification to check if it's our desktop token format
+    const unverifiedDecoded = jwt.decode(token);
+    
+    // If it's not an object or doesn't have our desktop token structure, skip validation
+    if (!unverifiedDecoded || typeof unverifiedDecoded !== 'object' || unverifiedDecoded.type !== 'desktop') {
+      return null;
+    }
+    
+    // Now verify the token since it looks like ours
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: 'libre-cloud-app',
       audience: 'libre-cloud-desktop',
@@ -38,7 +47,7 @@ export function verifyDesktopJWT(token: string): DesktopJWTPayload | null {
 
     return null;
   } catch (error) {
-    console.error('JWT verification failed:', error);
+    // Silently fail for JWT verification errors to allow fallback to Clerk
     return null;
   }
 }
