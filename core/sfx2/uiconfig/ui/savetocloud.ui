@@ -124,6 +124,7 @@
                   <item id="docx" translatable="yes">Microsoft Word (.docx)</item>
                   <item id="xlsx" translatable="yes">Microsoft Excel (.xlsx)</item>
                   <item id="pptx" translatable="yes">Microsoft PowerPoint (.pptx)</item>
+                  <item id="txt" translatable="yes">Text File (.txt)</item>
                 </items>
               </object>
               <packing>

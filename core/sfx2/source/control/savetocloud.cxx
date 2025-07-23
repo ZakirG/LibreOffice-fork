@@ -333,6 +333,8 @@ bool SaveToCloudHandler::getDocumentDataWithFormat(std::vector<char>& rDocumentD
             sFilterName = "Calc MS Excel 2007 XML";
         else if (rsExtension == ".pptx")
             sFilterName = "Impress MS PowerPoint 2007 XML";
+        else if (rsExtension == ".txt")
+            sFilterName = "Text";
         else
             sFilterName = "writer8"; // Default fallback
             

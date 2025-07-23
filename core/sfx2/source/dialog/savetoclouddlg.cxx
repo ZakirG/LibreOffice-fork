@@ -90,6 +90,8 @@ void SaveToCloudDialog::setDefaultFormat(const OUString& rCurrentExtension)
         m_xFormatCombo->set_active(5); // Microsoft Excel
     else if (sExt == u".pptx" || sExt == u".ppt")
         m_xFormatCombo->set_active(6); // Microsoft PowerPoint
+    else if (sExt == u".txt")
+        m_xFormatCombo->set_active(7); // Text File
     else
         m_xFormatCombo->set_active(0); // Default to ODT
 }
@@ -105,6 +107,7 @@ OUString SaveToCloudDialog::getFileExtensionFromFormat() const
         case 4: return u".docx"_ustr;
         case 5: return u".xlsx"_ustr;
         case 6: return u".pptx"_ustr;
+        case 7: return u".txt"_ustr;
         default: return u".odt"_ustr;
     }
 }
@@ -120,6 +123,7 @@ OUString SaveToCloudDialog::getContentTypeFromFormat() const
         case 4: return u"application/vnd.openxmlformats-officedocument.wordprocessingml.document"_ustr;
         case 5: return u"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"_ustr;
         case 6: return u"application/vnd.openxmlformats-officedocument.presentationml.presentation"_ustr;
+        case 7: return u"text/plain"_ustr;
         default: return u"application/vnd.oasis.opendocument.text"_ustr;
     }
 }
