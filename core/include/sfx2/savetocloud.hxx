@@ -13,11 +13,19 @@
 #include <sfx2/dllapi.h>
 #include <rtl/ustring.hxx>
 #include <memory>
+#include <vector>
 
 class SfxObjectShell;
 class SfxRequest;
 class CloudApiClient;
 class CloudAuthHandler;
+
+enum class CloudUploadResult
+{
+    SUCCESS,
+    AUTH_EXPIRED,
+    GENERAL_ERROR
+};
 
 /**
  * SaveToCloudHandler handles saving LibreOffice documents to cloud storage.
@@ -61,21 +69,35 @@ private:
 
     /**
      * Get the document data as byte stream
-     * @param rDocumentData [out] Document data
+     * @param rDocumentData [out] Document data as binary vector
      * @param rsFileName [out] Generated filename with extension
      * @param rsContentType [out] MIME content type
      * @return true if successful
      */
-    bool getDocumentData(OUString& rDocumentData, OUString& rsFileName, OUString& rsContentType);
+    bool getDocumentData(std::vector<char>& rDocumentData, OUString& rsFileName, OUString& rsContentType);
 
     /**
      * Upload document to cloud storage
-     * @param sDocumentData Document data as string
+     * @param rDocumentData Document data as binary vector
      * @param sFileName File name with extension
      * @param sContentType MIME content type
      * @return true if successful
      */
-    bool uploadToCloud(const OUString& sDocumentData, const OUString& sFileName, const OUString& sContentType);
+    bool uploadToCloud(const std::vector<char>& rDocumentData, const OUString& sFileName, const OUString& sContentType);
+
+    /**
+     * Upload document to cloud storage with improved error handling
+     * @param rDocumentData Document data as binary vector
+     * @param sFileName File name with extension
+     * @param sContentType MIME content type
+     * @return CloudUploadResult indicating success or specific error type
+     */
+    CloudUploadResult uploadToCloudWithErrorHandling(const std::vector<char>& rDocumentData, const OUString& sFileName, const OUString& sContentType);
+
+    /**
+     * Handle expired authentication gracefully
+     */
+    void handleExpiredAuthentication();
 
     /**
      * Show upload progress dialog

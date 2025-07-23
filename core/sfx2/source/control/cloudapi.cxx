@@ -200,10 +200,18 @@ bool CloudApiClient::requestPresignedUrl(const OUString& sMode, const OUString& 
                                         const OUString& sContentType, OUString& rsPresignedUrl,
                                         OUString& rsDocId)
 {
+    std::cerr << "*** DEBUG: requestPresignedUrl called ***" << std::endl;
+    std::cerr << "*** DEBUG: Mode: " << OUStringToOString(sMode, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    std::cerr << "*** DEBUG: FileName: " << OUStringToOString(sFileName, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    
     if (!m_pCurl || m_sJwtToken.isEmpty())
+    {
+        std::cerr << "*** DEBUG: requestPresignedUrl FAILED - curl: " << (m_pCurl ? "OK" : "NULL") << ", JWT empty: " << (m_sJwtToken.isEmpty() ? "YES" : "NO") << " ***" << std::endl;
         return false;
+    }
 
     OUString sUrl = m_sBaseUrl + "/api/presign";
+    std::cerr << "*** DEBUG: Presign URL: " << OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
     
     // Build JSON request body
     tools::JsonWriter aJson;
@@ -216,11 +224,21 @@ bool CloudApiClient::requestPresignedUrl(const OUString& sMode, const OUString& 
     OUString sResponse;
     long nResponseCode = 0;
 
+    std::cerr << "*** DEBUG: Sending presign request ***" << std::endl;
+    std::cerr << "*** DEBUG: Request body: " << OUStringToOString(sRequestBody, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    
     if (!httpPost(sUrl, sRequestBody, sResponse, &nResponseCode))
+    {
+        std::cerr << "*** DEBUG: httpPost FAILED for presign request ***" << std::endl;
         return false;
+    }
+
+    std::cerr << "*** DEBUG: Presign response code: " << nResponseCode << " ***" << std::endl;
+    std::cerr << "*** DEBUG: Presign response body: " << OUStringToOString(sResponse, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
 
     if (nResponseCode != 200)
     {
+        std::cerr << "*** DEBUG: Presign request failed with non-200 code ***" << std::endl;
         SAL_WARN("sfx.control", "Presign request failed with code: " << nResponseCode);
         return false;
     }
@@ -229,15 +247,27 @@ bool CloudApiClient::requestPresignedUrl(const OUString& sMode, const OUString& 
     rsPresignedUrl = extractJsonValue(sResponse, "presignedUrl");
     rsDocId = extractJsonValue(sResponse, "docId");
 
+    std::cerr << "*** DEBUG: Extracted presignedUrl empty: " << (rsPresignedUrl.isEmpty() ? "YES" : "NO") << " ***" << std::endl;
+    std::cerr << "*** DEBUG: Extracted docId empty: " << (rsDocId.isEmpty() ? "YES" : "NO") << " ***" << std::endl;
+
     return !rsPresignedUrl.isEmpty() && !rsDocId.isEmpty();
 }
 
 bool CloudApiClient::registerDocument(const OUString& sDocId, const OUString& sFileName, sal_Int64 nFileSize)
 {
+    std::cerr << "*** DEBUG: registerDocument() called ***" << std::endl;
+    std::cerr << "*** DEBUG: DocId: " << OUStringToOString(sDocId, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    std::cerr << "*** DEBUG: FileName: " << OUStringToOString(sFileName, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    std::cerr << "*** DEBUG: FileSize: " << nFileSize << " bytes ***" << std::endl;
+    
     if (!m_pCurl || m_sJwtToken.isEmpty())
+    {
+        std::cerr << "*** DEBUG: registerDocument failed - curl: " << (m_pCurl ? "OK" : "NULL") << ", JWT empty: " << (m_sJwtToken.isEmpty() ? "YES" : "NO") << " ***" << std::endl;
         return false;
+    }
 
     OUString sUrl = m_sBaseUrl + "/api/documents";
+    std::cerr << "*** DEBUG: Registration URL: " << OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
     
     // Build JSON request body
     tools::JsonWriter aJson;
@@ -246,13 +276,25 @@ bool CloudApiClient::registerDocument(const OUString& sDocId, const OUString& sF
     aJson.put("fileSize", static_cast<sal_Int64>(nFileSize));
 
     OUString sRequestBody = OUString::fromUtf8(aJson.finishAndGetAsOString());
+    std::cerr << "*** DEBUG: Request body: " << OUStringToOString(sRequestBody, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    
     OUString sResponse;
     long nResponseCode = 0;
 
+    std::cerr << "*** DEBUG: Making POST request to register document ***" << std::endl;
     if (!httpPost(sUrl, sRequestBody, sResponse, &nResponseCode))
+    {
+        std::cerr << "*** DEBUG: httpPost failed for document registration ***" << std::endl;
         return false;
+    }
 
-    return nResponseCode == 200 || nResponseCode == 201;
+    std::cerr << "*** DEBUG: Registration response code: " << nResponseCode << " ***" << std::endl;
+    std::cerr << "*** DEBUG: Registration response body: " << OUStringToOString(sResponse, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    
+    bool bSuccess = (nResponseCode == 200 || nResponseCode == 201);
+    std::cerr << "*** DEBUG: Registration " << (bSuccess ? "SUCCESS" : "FAILED") << " ***" << std::endl;
+    
+    return bSuccess;
 }
 
 bool CloudApiClient::getDocuments(OUString& rsDocumentsJson)
@@ -305,8 +347,21 @@ bool CloudApiClient::httpGet(const OUString& sUrl, OUString& rsResponse, long* p
     if (!m_pCurl)
         return false;
 
+    std::cerr << "*** DEBUG: httpGet() called ***" << std::endl;
+    std::cerr << "*** DEBUG: URL: " << OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+
     CurlResponse response;
     OString sUrlUtf8 = OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8);
+
+    // CRITICAL FIX: Complete curl reset to prevent corruption
+    std::cerr << "*** DEBUG: Resetting curl options for clean GET request ***" << std::endl;
+    curl_easy_setopt(m_pCurl, CURLOPT_POST, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_UPLOAD, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_NOBODY, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_CUSTOMREQUEST, NULL);
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDS, NULL);
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDSIZE, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, NULL); // Clear any existing headers
 
     // Set URL
     curl_easy_setopt(m_pCurl, CURLOPT_URL, sUrlUtf8.getStr());
@@ -318,11 +373,23 @@ bool CloudApiClient::httpGet(const OUString& sUrl, OUString& rsResponse, long* p
     curl_easy_setopt(m_pCurl, CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(m_pCurl, CURLOPT_WRITEDATA, &response);
 
-    // Add authentication header
-    addAuthHeader();
+    // Create headers locally (not using shared m_pHeaders to avoid thread issues)
+    struct curl_slist* headers = nullptr;
+    if (!m_sJwtToken.isEmpty()) {
+        std::cerr << "*** DEBUG: Adding authorization header to GET request ***" << std::endl;
+        OString sAuthHeader = "Authorization: Bearer " + OUStringToOString(m_sJwtToken, RTL_TEXTENCODING_UTF8);
+        headers = curl_slist_append(headers, sAuthHeader.getStr());
+        curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, headers);
+    }
     
     // Perform request
+    std::cerr << "*** DEBUG: Performing HTTP GET request ***" << std::endl;
     CURLcode res = curl_easy_perform(m_pCurl);
+    
+    // Clean up headers
+    if (headers) {
+        curl_slist_free_all(headers);
+    }
     
     if (res == CURLE_OK)
     {
@@ -336,12 +403,15 @@ bool CloudApiClient::httpGet(const OUString& sUrl, OUString& rsResponse, long* p
             curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, &m_nLastResponseCode);
         }
         
+        std::cerr << "*** DEBUG: GET request completed with response code: " << m_nLastResponseCode << " ***" << std::endl;
         rsResponse = OUString::fromUtf8(response.data.toString());
+        std::cerr << "*** DEBUG: GET response body: " << OUStringToOString(rsResponse, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
         return true;
     }
     else
     {
         m_nLastResponseCode = 0; // Network error
+        std::cerr << "*** DEBUG: HTTP GET failed with curl error: " << curl_easy_strerror(res) << " ***" << std::endl;
         SAL_WARN("sfx.control", "HTTP GET failed: " << curl_easy_strerror(res));
         return false;
     }
@@ -352,14 +422,27 @@ bool CloudApiClient::httpPost(const OUString& sUrl, const OUString& sBody, OUStr
     if (!m_pCurl)
         return false;
 
+    std::cerr << "*** DEBUG: httpPost() called ***" << std::endl;
+    std::cerr << "*** DEBUG: URL: " << OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    std::cerr << "*** DEBUG: Request body: " << OUStringToOString(sBody, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+
     CurlResponse response;
     OString sUrlUtf8 = OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8);
     OString sBodyUtf8 = OUStringToOString(sBody, RTL_TEXTENCODING_UTF8);
+
+    // Reset curl options that might interfere from previous requests (especially S3 upload)
+    std::cerr << "*** DEBUG: Resetting curl options for clean POST request ***" << std::endl;
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPGET, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_UPLOAD, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_NOBODY, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_CUSTOMREQUEST, NULL);
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, NULL); // Clear any existing headers
 
     // Set URL
     curl_easy_setopt(m_pCurl, CURLOPT_URL, sUrlUtf8.getStr());
     
     // Set to POST request
+    std::cerr << "*** DEBUG: Setting POST options ***" << std::endl;
     curl_easy_setopt(m_pCurl, CURLOPT_POST, 1L);
     curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDS, sBodyUtf8.getStr());
     curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDSIZE, sBodyUtf8.getLength());
@@ -368,11 +451,25 @@ bool CloudApiClient::httpPost(const OUString& sUrl, const OUString& sBody, OUStr
     curl_easy_setopt(m_pCurl, CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(m_pCurl, CURLOPT_WRITEDATA, &response);
 
-    // Add authentication header
-    addAuthHeader();
+    // Create headers locally (not using shared addAuthHeader to avoid corruption)
+    struct curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    
+    if (!m_sJwtToken.isEmpty()) {
+        std::cerr << "*** DEBUG: Adding authentication header ***" << std::endl;
+        OString sAuthHeader = "Authorization: Bearer " + OUStringToOString(m_sJwtToken, RTL_TEXTENCODING_UTF8);
+        headers = curl_slist_append(headers, sAuthHeader.getStr());
+    }
+    
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, headers);
+    std::cerr << "*** DEBUG: Added Content-Type: application/json header ***" << std::endl;
     
     // Perform request
+    std::cerr << "*** DEBUG: Performing HTTP POST request ***" << std::endl;
     CURLcode res = curl_easy_perform(m_pCurl);
+    
+    // Clean up headers
+    curl_slist_free_all(headers);
     
     if (res == CURLE_OK)
     {
@@ -386,12 +483,15 @@ bool CloudApiClient::httpPost(const OUString& sUrl, const OUString& sBody, OUStr
             curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, &m_nLastResponseCode);
         }
         
+        std::cerr << "*** DEBUG: POST request completed with response code: " << m_nLastResponseCode << " ***" << std::endl;
         rsResponse = OUString::fromUtf8(response.data.toString());
+        std::cerr << "*** DEBUG: POST response body: " << OUStringToOString(rsResponse, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
         return true;
     }
     else
     {
         m_nLastResponseCode = 0; // Network error
+        std::cerr << "*** DEBUG: HTTP POST failed with curl error: " << curl_easy_strerror(res) << " ***" << std::endl;
         SAL_WARN("sfx.control", "HTTP POST failed: " << curl_easy_strerror(res));
         return false;
     }
@@ -402,8 +502,21 @@ bool CloudApiClient::httpDelete(const OUString& sUrl, OUString& rsResponse, long
     if (!m_pCurl)
         return false;
 
+    std::cerr << "*** DEBUG: httpDelete() called ***" << std::endl;
+    std::cerr << "*** DEBUG: URL: " << OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+
     CurlResponse response;
     OString sUrlUtf8 = OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8);
+
+    // Reset curl options for clean DELETE request
+    std::cerr << "*** DEBUG: Resetting curl options for clean DELETE request ***" << std::endl;
+    curl_easy_setopt(m_pCurl, CURLOPT_POST, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPGET, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_UPLOAD, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_NOBODY, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDS, NULL);
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDSIZE, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, NULL); // Clear any existing headers
 
     // Set URL
     curl_easy_setopt(m_pCurl, CURLOPT_URL, sUrlUtf8.getStr());
@@ -415,11 +528,100 @@ bool CloudApiClient::httpDelete(const OUString& sUrl, OUString& rsResponse, long
     curl_easy_setopt(m_pCurl, CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(m_pCurl, CURLOPT_WRITEDATA, &response);
 
-    // Add authentication header
-    addAuthHeader();
+    // Create headers locally (not using shared addAuthHeader to avoid corruption)
+    struct curl_slist* headers = nullptr;
+    if (!m_sJwtToken.isEmpty()) {
+        std::cerr << "*** DEBUG: Adding authorization header to DELETE request ***" << std::endl;
+        OString sAuthHeader = "Authorization: Bearer " + OUStringToOString(m_sJwtToken, RTL_TEXTENCODING_UTF8);
+        headers = curl_slist_append(headers, sAuthHeader.getStr());
+        curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, headers);
+    }
+    
+    // Perform request
+    std::cerr << "*** DEBUG: Performing HTTP DELETE request ***" << std::endl;
+    CURLcode res = curl_easy_perform(m_pCurl);
+    
+    // Clean up headers
+    if (headers) {
+        curl_slist_free_all(headers);
+    }
+    
+    if (res == CURLE_OK)
+    {
+        if (pnResponseCode)
+        {
+            curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, pnResponseCode);
+            m_nLastResponseCode = *pnResponseCode;
+        }
+        else
+        {
+            curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, &m_nLastResponseCode);
+        }
+        
+        std::cerr << "*** DEBUG: DELETE request completed with response code: " << m_nLastResponseCode << " ***" << std::endl;
+        rsResponse = OUString::fromUtf8(response.data.toString());
+        std::cerr << "*** DEBUG: DELETE response body: " << OUStringToOString(rsResponse, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+        return true;
+    }
+    else
+    {
+        m_nLastResponseCode = 0; // Network error
+        std::cerr << "*** DEBUG: HTTP DELETE failed with curl error: " << curl_easy_strerror(res) << " ***" << std::endl;
+        SAL_WARN("sfx.control", "HTTP DELETE failed: " << curl_easy_strerror(res));
+        return false;
+    }
+}
+
+bool CloudApiClient::uploadFile(const OUString& sUrl, const char* pData, size_t nDataSize, 
+                               const OUString& sContentType, OUString& rsResponse, long* pnResponseCode)
+{
+    if (!m_pCurl || !pData || nDataSize == 0)
+        return false;
+
+    CurlResponse response;
+    OString sUrlUtf8 = OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8);
+
+    // Reset curl options that might interfere from previous requests
+    std::cerr << "*** DEBUG: Resetting curl options for clean S3 upload ***" << std::endl;
+    curl_easy_setopt(m_pCurl, CURLOPT_POST, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPGET, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_UPLOAD, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_NOBODY, 0L);
+    
+    // Set URL
+    curl_easy_setopt(m_pCurl, CURLOPT_URL, sUrlUtf8.getStr());
+    
+    // Configure for PUT request with data
+    std::cerr << "*** DEBUG: Configuring curl for PUT request with " << nDataSize << " bytes ***" << std::endl;
+    
+    // Use CUSTOMREQUEST for PUT with POSTFIELDS (this is the correct way for S3)
+    curl_easy_setopt(m_pCurl, CURLOPT_CUSTOMREQUEST, "PUT");
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDS, pData);
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDSIZE, nDataSize);
+    
+    // Set write callback for response
+    curl_easy_setopt(m_pCurl, CURLOPT_WRITEFUNCTION, writeCallback);
+    curl_easy_setopt(m_pCurl, CURLOPT_WRITEDATA, &response);
+
+    // Set up headers for file upload - minimize headers to match S3 signature
+    struct curl_slist* uploadHeaders = nullptr;
+    
+    // For S3 presigned URLs, we should NOT add Content-Type header unless it was 
+    // included in the signature. The SignedHeaders=host indicates only host was signed.
+    // Adding extra headers can cause 403 errors.
+    
+    std::cerr << "*** DEBUG: Setting minimal headers for S3 upload ***" << std::endl;
+    
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, uploadHeaders);
     
     // Perform request
     CURLcode res = curl_easy_perform(m_pCurl);
+    
+    // Clean up upload headers
+    if (uploadHeaders)
+    {
+        curl_slist_free_all(uploadHeaders);
+    }
     
     if (res == CURLE_OK)
     {
@@ -434,12 +636,18 @@ bool CloudApiClient::httpDelete(const OUString& sUrl, OUString& rsResponse, long
         }
         
         rsResponse = OUString::fromUtf8(response.data.toString());
+        
+        // Log the upload result
+        std::cerr << "*** DEBUG: HTTP PUT completed with code: " << m_nLastResponseCode << " ***" << std::endl;
+        SAL_WARN("sfx.control", "HTTP PUT completed with code: " << m_nLastResponseCode);
+        
         return true;
     }
     else
     {
         m_nLastResponseCode = 0; // Network error
-        SAL_WARN("sfx.control", "HTTP DELETE failed: " << curl_easy_strerror(res));
+        std::cerr << "*** DEBUG: HTTP PUT failed: " << curl_easy_strerror(res) << " ***" << std::endl;
+        SAL_WARN("sfx.control", "HTTP PUT failed: " << curl_easy_strerror(res));
         return false;
     }
 }

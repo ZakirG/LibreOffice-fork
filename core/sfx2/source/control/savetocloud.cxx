@@ -90,19 +90,45 @@ bool SaveToCloudHandler::Execute(SfxRequest& rReq)
         showProgressDialog("Preparing document for cloud upload...");
 
         // Get document data
-        OUString sDocumentData, sFileName, sContentType;
-        if (!getDocumentData(sDocumentData, sFileName, sContentType))
+        std::cerr << "*** DEBUG: Starting document data preparation ***" << std::endl;
+        SAL_WARN("sfx.control", "Starting document data preparation");
+        
+        std::vector<char> documentData;
+        OUString sFileName, sContentType;
+        if (!getDocumentData(documentData, sFileName, sContentType))
         {
+            std::cerr << "*** DEBUG: FAILED to prepare document data ***" << std::endl;
+            SAL_WARN("sfx.control", "Failed to prepare document data");
             hideProgressDialog();
             showErrorMessage("Failed to prepare document data for upload.");
             m_bOperationInProgress = false;
             return false;
         }
+        
+        std::cerr << "*** DEBUG: Document data prepared successfully ***" << std::endl;
+        std::cerr << "*** DEBUG: File name: " << OUStringToOString(sFileName, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+        std::cerr << "*** DEBUG: Data size: " << documentData.size() << " bytes ***" << std::endl;
+        SAL_WARN("sfx.control", "Document data prepared: " << sFileName << ", size: " << documentData.size());
 
         // Upload to cloud
         showProgressDialog("Uploading document to LibreCloud...");
-        if (!uploadToCloud(sDocumentData, sFileName, sContentType))
+        
+        CloudUploadResult uploadResult = uploadToCloudWithErrorHandling(documentData, sFileName, sContentType);
+        if (uploadResult == CloudUploadResult::SUCCESS)
         {
+            // Upload successful - continue to success message
+        }
+        else if (uploadResult == CloudUploadResult::AUTH_EXPIRED)
+        {
+            // Handle expired authentication gracefully
+            hideProgressDialog();
+            handleExpiredAuthentication();
+            m_bOperationInProgress = false;
+            return false;
+        }
+        else
+        {
+            // Other upload errors
             hideProgressDialog();
             showErrorMessage("Failed to upload document to cloud.");
             m_bOperationInProgress = false;
@@ -170,7 +196,7 @@ bool SaveToCloudHandler::checkAuthentication()
     return true;
 }
 
-bool SaveToCloudHandler::getDocumentData(OUString& rDocumentData, OUString& rsFileName, OUString& rsContentType)
+bool SaveToCloudHandler::getDocumentData(std::vector<char>& rDocumentData, OUString& rsFileName, OUString& rsContentType)
 {
     try
     {
@@ -228,15 +254,11 @@ bool SaveToCloudHandler::getDocumentData(OUString& rDocumentData, OUString& rsFi
             return false;
         }
 
-        // Read file content into string
-        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        // Read file content into binary vector
+        rDocumentData.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         file.close();
 
-        // Convert to OUString (for now, we'll use base64 encoding for binary data)
-        // In a real implementation, you'd want to send binary data directly
-        rDocumentData = OUString::fromUtf8(content.c_str());
-
-        SAL_WARN("sfx.control", "Document data prepared, size: " << content.length() << " bytes");
+        SAL_WARN("sfx.control", "Document data prepared, size: " << rDocumentData.size() << " bytes");
         return true;
     }
     catch (const uno::Exception& e)
@@ -246,7 +268,7 @@ bool SaveToCloudHandler::getDocumentData(OUString& rDocumentData, OUString& rsFi
     }
 }
 
-bool SaveToCloudHandler::uploadToCloud(const OUString& sDocumentData, const OUString& sFileName, const OUString& sContentType)
+bool SaveToCloudHandler::uploadToCloud(const std::vector<char>& rDocumentData, const OUString& sFileName, const OUString& sContentType)
 {
     if (!m_pApiClient)
     {
@@ -266,11 +288,28 @@ bool SaveToCloudHandler::uploadToCloud(const OUString& sDocumentData, const OUSt
 
         SAL_WARN("sfx.control", "Got presigned URL for upload, docId: " << sDocId);
 
-        // TODO: Implement actual file upload using the presigned URL
-        // For now, we'll simulate success and register the document metadata
+        // Upload file to presigned URL
+        OUString sUploadResponse;
+        long nUploadResponseCode = 0;
         
-        // Calculate file size (simplified)
-        sal_Int64 nFileSize = sDocumentData.getLength();
+        if (!m_pApiClient->uploadFile(sPresignedUrl, rDocumentData.data(), rDocumentData.size(), 
+                                     sContentType, sUploadResponse, &nUploadResponseCode))
+        {
+            SAL_WARN("sfx.control", "Failed to upload file to presigned URL");
+            return false;
+        }
+        
+        SAL_WARN("sfx.control", "File upload completed with response code: " << nUploadResponseCode);
+        
+        // Check if upload was successful (AWS S3 typically returns 200)
+        if (nUploadResponseCode != 200 && nUploadResponseCode != 204)
+        {
+            SAL_WARN("sfx.control", "File upload failed with response code: " << nUploadResponseCode);
+            return false;
+        }
+        
+        // Calculate file size
+        sal_Int64 nFileSize = static_cast<sal_Int64>(rDocumentData.size());
 
         // Register document metadata
         if (!m_pApiClient->registerDocument(sDocId, sFileName, nFileSize))
@@ -286,6 +325,132 @@ bool SaveToCloudHandler::uploadToCloud(const OUString& sDocumentData, const OUSt
     {
         SAL_WARN("sfx.control", "Exception during upload: " << e.what());
         return false;
+    }
+}
+
+CloudUploadResult SaveToCloudHandler::uploadToCloudWithErrorHandling(const std::vector<char>& rDocumentData, const OUString& sFileName, const OUString& sContentType)
+{
+    if (!m_pApiClient)
+    {
+        SAL_WARN("sfx.control", "API client not available for upload");
+        return CloudUploadResult::GENERAL_ERROR;
+    }
+
+    try
+    {
+        // Request presigned URL for upload
+        std::cerr << "*** DEBUG: Requesting presigned URL for file: " << OUStringToOString(sFileName, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+        std::cerr << "*** DEBUG: Content type: " << OUStringToOString(sContentType, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+        SAL_WARN("sfx.control", "Requesting presigned URL for: " << sFileName);
+        
+        OUString sPresignedUrl, sDocId;
+        if (!m_pApiClient->requestPresignedUrl("put", sFileName, sContentType, sPresignedUrl, sDocId))
+        {
+            // Check if this was an auth error by looking at the response code
+            long nLastResponseCode = m_pApiClient->getLastResponseCode();
+            if (nLastResponseCode == 401)
+            {
+                std::cerr << "*** DEBUG: 401 Authentication error detected ***" << std::endl;
+                SAL_WARN("sfx.control", "Authentication expired (401) while requesting presigned URL");
+                return CloudUploadResult::AUTH_EXPIRED;
+            }
+            
+            std::cerr << "*** DEBUG: FAILED to get presigned URL ***" << std::endl;
+            SAL_WARN("sfx.control", "Failed to get presigned URL for upload");
+            return CloudUploadResult::GENERAL_ERROR;
+        }
+
+        std::cerr << "*** DEBUG: SUCCESS - Got presigned URL ***" << std::endl;
+        std::cerr << "*** DEBUG: DocId: " << OUStringToOString(sDocId, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+        std::cerr << "*** DEBUG: Presigned URL (first 100 chars): " << OUStringToOString(sPresignedUrl.copy(0, 100), RTL_TEXTENCODING_UTF8).getStr() << "..." << std::endl;
+        SAL_WARN("sfx.control", "Got presigned URL for upload, docId: " << sDocId);
+
+        // Upload file to presigned URL - note: presigned URLs expire quickly (usually 60 seconds)
+        std::cerr << "*** DEBUG: Starting file upload to presigned URL ***" << std::endl;
+        std::cerr << "*** DEBUG: File size: " << rDocumentData.size() << " bytes ***" << std::endl;
+        std::cerr << "*** DEBUG: WARNING: Presigned URL expires in 60 seconds, uploading immediately ***" << std::endl;
+        SAL_WARN("sfx.control", "Uploading file data to presigned URL, size: " << rDocumentData.size() << " bytes");
+        
+        OUString sUploadResponse;
+        long nUploadResponseCode = 0;
+        
+        if (!m_pApiClient->uploadFile(sPresignedUrl, rDocumentData.data(), rDocumentData.size(), 
+                                     sContentType, sUploadResponse, &nUploadResponseCode))
+        {
+            std::cerr << "*** DEBUG: File upload FAILED ***" << std::endl;
+            SAL_WARN("sfx.control", "Failed to upload file to presigned URL");
+            return CloudUploadResult::GENERAL_ERROR;
+        }
+        
+        std::cerr << "*** DEBUG: File upload completed with response code: " << nUploadResponseCode << " ***" << std::endl;
+        SAL_WARN("sfx.control", "File upload completed with response code: " << nUploadResponseCode);
+        
+        // Check if upload was successful (AWS S3 typically returns 200)
+        if (nUploadResponseCode != 200 && nUploadResponseCode != 204)
+        {
+            std::cerr << "*** DEBUG: Upload failed with non-success response code ***" << std::endl;
+            SAL_WARN("sfx.control", "File upload failed with response code: " << nUploadResponseCode);
+            return CloudUploadResult::GENERAL_ERROR;
+        }
+        
+        // Calculate file size
+        sal_Int64 nFileSize = static_cast<sal_Int64>(rDocumentData.size());
+
+        // Register document metadata
+        if (!m_pApiClient->registerDocument(sDocId, sFileName, nFileSize))
+        {
+            // Check if this was an auth error 
+            long nRegisterResponseCode = m_pApiClient->getLastResponseCode();
+            if (nRegisterResponseCode == 401)
+            {
+                std::cerr << "*** DEBUG: 401 Authentication error during document registration ***" << std::endl;
+                SAL_WARN("sfx.control", "Authentication expired (401) while registering document");
+                return CloudUploadResult::AUTH_EXPIRED;
+            }
+            
+            SAL_WARN("sfx.control", "Failed to register document metadata");
+            return CloudUploadResult::GENERAL_ERROR;
+        }
+
+        SAL_WARN("sfx.control", "Document uploaded successfully, docId: " << sDocId);
+        return CloudUploadResult::SUCCESS;
+    }
+    catch (const std::exception& e)
+    {
+        SAL_WARN("sfx.control", "Exception during upload: " << e.what());
+        return CloudUploadResult::GENERAL_ERROR;
+    }
+}
+
+void SaveToCloudHandler::handleExpiredAuthentication()
+{
+    // Clear the expired token from the auth handler
+    if (m_pAuthHandler)
+    {
+        m_pAuthHandler->clearExpiredToken();
+    }
+    
+    // Show user-friendly message with option to re-authenticate
+    std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(nullptr,
+        VclMessageType::Warning, VclButtonsType::YesNo,
+        "Your login session has expired.\n\n"
+        "Would you like to log in again to continue saving to the cloud?"));
+    xBox->set_title("LibreCloud Session Expired");
+    
+    if (xBox->run() == RET_YES)
+    {
+        // User wants to re-authenticate
+        if (m_pAuthHandler)
+        {
+            m_pAuthHandler->startAuthentication();
+        }
+        
+        // Show follow-up message
+        std::unique_ptr<weld::MessageDialog> xFollowUp(Application::CreateMessageDialog(nullptr,
+            VclMessageType::Info, VclButtonsType::Ok,
+            "Please complete the authentication process in your browser, then try saving again."));
+        xFollowUp->set_title("LibreCloud Authentication");
+        xFollowUp->run();
     }
 }
 

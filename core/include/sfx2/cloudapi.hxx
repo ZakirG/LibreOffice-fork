@@ -104,6 +104,19 @@ public:
      */
     bool deleteDocument(const OUString& sDocId);
 
+    /**
+     * Upload binary data to URL (for presigned URL uploads)
+     * @param sUrl URL to upload to (presigned URL)
+     * @param pData Binary data to upload
+     * @param nDataSize Size of binary data
+     * @param sContentType MIME type of the data
+     * @param rsResponse [out] Response body
+     * @param pnResponseCode [out] HTTP response code (optional)
+     * @return true if request completed successfully
+     */
+    bool uploadFile(const OUString& sUrl, const char* pData, size_t nDataSize, 
+                   const OUString& sContentType, OUString& rsResponse, long* pnResponseCode = nullptr);
+
 private:
     /**
      * Perform HTTP GET request
@@ -132,6 +145,8 @@ private:
      * @return true if request completed successfully
      */
     bool httpDelete(const OUString& sUrl, OUString& rsResponse, long* pnResponseCode = nullptr);
+
+
 
     /**
      * Set up common curl options

@@ -30,11 +30,19 @@ export function generateDesktopJWT(userId: string, email: string): string {
 }
 
 export function verifyDesktopJWT(token: string): DesktopJWTPayload | null {
+  console.log('[BACKEND DEBUG] verifyDesktopJWT called with token length:', token?.length);
+  console.log('[BACKEND DEBUG] Token preview:', token?.substring(0, 50) + '...');
+  
   try {
     // First, try to decode as base64 (Phase 4 desktop token format)
     try {
+      console.log('[BACKEND DEBUG] Attempting base64 decode...');
       const base64Decoded = Buffer.from(token, 'base64').toString('utf-8');
+      console.log('[BACKEND DEBUG] Base64 decoded successfully, length:', base64Decoded.length);
+      
       const tokenData = JSON.parse(base64Decoded);
+      console.log('[BACKEND DEBUG] JSON parsed successfully, type:', tokenData.type);
+      console.log('[BACKEND DEBUG] Token data:', JSON.stringify(tokenData, null, 2));
       
       // Validate it's a desktop token with required fields
       if (tokenData.type === 'desktop' && 
@@ -43,28 +51,38 @@ export function verifyDesktopJWT(token: string): DesktopJWTPayload | null {
           tokenData.exp && 
           tokenData.iat) {
         
+        console.log('[BACKEND DEBUG] Basic validation passed');
+        
         // Check if token is expired
         const now = Math.floor(Date.now() / 1000);
+        console.log('[BACKEND DEBUG] Current time:', now, 'Token exp:', tokenData.exp);
+        
         if (tokenData.exp < now) {
-          console.log('Desktop token expired');
+          console.log('[BACKEND DEBUG] Desktop token expired');
           return null;
         }
         
+        console.log('[BACKEND DEBUG] Token not expired');
+        
         // Check issuer and audience if present
         if (tokenData.iss && tokenData.iss !== 'libre-cloud-app') {
-          console.log('Invalid token issuer');
+          console.log('[BACKEND DEBUG] Invalid token issuer:', tokenData.iss);
           return null;
         }
         
         if (tokenData.aud && tokenData.aud !== 'libre-cloud-desktop') {
-          console.log('Invalid token audience');
+          console.log('[BACKEND DEBUG] Invalid token audience:', tokenData.aud);
           return null;
         }
         
-        console.log('Base64 desktop token validated successfully for user:', tokenData.userId);
+        console.log('[BACKEND DEBUG] Base64 desktop token validated successfully for user:', tokenData.userId);
         return tokenData as DesktopJWTPayload;
+      } else {
+        console.log('[BACKEND DEBUG] Basic validation failed - missing required fields');
+        console.log('[BACKEND DEBUG] type:', tokenData.type, 'userId:', !!tokenData.userId, 'email:', !!tokenData.email, 'exp:', !!tokenData.exp, 'iat:', !!tokenData.iat);
       }
     } catch (base64Error) {
+      console.log('[BACKEND DEBUG] Base64 decode failed:', base64Error instanceof Error ? base64Error.message : String(base64Error));
       // Not a valid base64 token, try JWT parsing
     }
     
