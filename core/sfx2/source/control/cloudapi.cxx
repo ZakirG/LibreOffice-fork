@@ -251,14 +251,28 @@ bool CloudApiClient::registerDocument(const OUString& sDocId, const OUString& sF
 
 bool CloudApiClient::getDocuments(OUString& rsDocumentsJson)
 {
+    std::cerr << "*** DEBUG: CloudApiClient::getDocuments() called ***" << std::endl;
+    
     if (!m_pCurl || m_sJwtToken.isEmpty())
+    {
+        std::cerr << "*** DEBUG: getDocuments failed - curl: " << (m_pCurl ? "OK" : "NULL") << ", JWT empty: " << (m_sJwtToken.isEmpty() ? "YES" : "NO") << " ***" << std::endl;
         return false;
+    }
 
     OUString sUrl = m_sBaseUrl + "/api/documents";
     long nResponseCode = 0;
 
+    std::cerr << "*** DEBUG: Making GET request to: " << OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    std::cerr << "*** DEBUG: JWT token length: " << m_sJwtToken.getLength() << " ***" << std::endl;
+
     if (!httpGet(sUrl, rsDocumentsJson, &nResponseCode))
+    {
+        std::cerr << "*** DEBUG: httpGet failed ***" << std::endl;
         return false;
+    }
+
+    std::cerr << "*** DEBUG: getDocuments response code: " << nResponseCode << " ***" << std::endl;
+    std::cerr << "*** DEBUG: getDocuments response: " << OUStringToOString(rsDocumentsJson, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
 
     return nResponseCode == 200;
 }
@@ -429,8 +443,13 @@ void CloudApiClient::setupCommonOptions()
 
 void CloudApiClient::addAuthHeader()
 {
+    std::cerr << "*** DEBUG: addAuthHeader() called ***" << std::endl;
+    
     if (!m_pCurl || m_sJwtToken.isEmpty())
+    {
+        std::cerr << "*** DEBUG: addAuthHeader skipped - curl: " << (m_pCurl ? "OK" : "NULL") << ", token empty: " << (m_sJwtToken.isEmpty() ? "YES" : "NO") << " ***" << std::endl;
         return;
+    }
 
     // Free existing auth header if any
     if (m_pHeaders)
@@ -444,9 +463,13 @@ void CloudApiClient::addAuthHeader()
     m_pHeaders = curl_slist_append(m_pHeaders, "Accept: application/json");
     
     OString sAuthHeader = "Authorization: Bearer " + OUStringToOString(m_sJwtToken, RTL_TEXTENCODING_UTF8);
+    std::cerr << "*** DEBUG: Setting Authorization header: " << sAuthHeader.getStr() << " ***" << std::endl;
+    
     m_pHeaders = curl_slist_append(m_pHeaders, sAuthHeader.getStr());
     
     curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, m_pHeaders);
+    
+    std::cerr << "*** DEBUG: addAuthHeader completed successfully ***" << std::endl;
 }
 
 OUString CloudApiClient::extractJsonField(const OUString& sJson, const OUString& sField) const

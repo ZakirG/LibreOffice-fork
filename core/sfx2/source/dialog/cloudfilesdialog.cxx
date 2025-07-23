@@ -19,6 +19,7 @@
 #include <unotools/syslocale.hxx>
 #include <unotools/localedatawrapper.hxx>
 #include <rtl/math.hxx>
+#include <iostream>
 
 using namespace css;
 
@@ -79,22 +80,38 @@ void CloudFilesDialog::initializeDialog()
 
 void CloudFilesDialog::updateAuthenticationStatus()
 {
+    std::cerr << "*** DEBUG: CloudFilesDialog::updateAuthenticationStatus() called ***" << std::endl;
+    
     if (!mpAuthHandler)
     {
+        std::cerr << "*** DEBUG: No auth handler available ***" << std::endl;
         mxStatusLabel->set_label("Authentication system not available.");
         mxLoginButton->set_visible(false);
         mxRefreshButton->set_visible(false);
         return;
     }
 
+    std::cerr << "*** DEBUG: Auth in progress: " << (mpAuthHandler->isAuthInProgress() ? "YES" : "NO") << " ***" << std::endl;
+    std::cerr << "*** DEBUG: Is authenticated: " << (mpAuthHandler->isAuthenticated() ? "YES" : "NO") << " ***" << std::endl;
+
     if (mpAuthHandler->isAuthInProgress())
     {
+        std::cerr << "*** DEBUG: Setting auth in progress status ***" << std::endl;
         mxStatusLabel->set_label("Authentication in progress... Please complete login in your browser.");
         mxLoginButton->set_visible(false);
         mxRefreshButton->set_visible(true);
     }
     else if (mpAuthHandler->isAuthenticated())
     {
+        std::cerr << "*** DEBUG: User is authenticated, loading documents ***" << std::endl;
+        
+        // Make sure we have the API client
+        if (!mpApiClient)
+        {
+            std::cerr << "*** DEBUG: Getting API client from auth handler ***" << std::endl;
+            mpApiClient = mpAuthHandler->getApiClient();
+        }
+        
         mxStatusLabel->set_label("Connected to LibreCloud. Loading your documents...");
         mxLoginButton->set_visible(false);
         mxRefreshButton->set_visible(true);
@@ -102,6 +119,7 @@ void CloudFilesDialog::updateAuthenticationStatus()
     }
     else
     {
+        std::cerr << "*** DEBUG: User not authenticated ***" << std::endl;
         mxStatusLabel->set_label("You are not logged in to LibreCloud.");
         mxLoginButton->set_visible(true);
         mxRefreshButton->set_visible(false);
@@ -112,33 +130,45 @@ void CloudFilesDialog::updateAuthenticationStatus()
 
 void CloudFilesDialog::loadCloudDocuments()
 {
+    std::cerr << "*** DEBUG: CloudFilesDialog::loadCloudDocuments() called ***" << std::endl;
+    
     if (!mpApiClient)
     {
+        std::cerr << "*** DEBUG: No API client available ***" << std::endl;
         mxStatusLabel->set_label("API client not available.");
         return;
     }
 
+    std::cerr << "*** DEBUG: API client available, making request ***" << std::endl;
     mxStatusLabel->set_label("Loading cloud documents...");
     mxRefreshButton->set_sensitive(false);
 
     OUString sDocumentsJson;
+    std::cerr << "*** DEBUG: Calling getDocuments() ***" << std::endl;
+    
     if (mpApiClient->getDocuments(sDocumentsJson))
     {
+        std::cerr << "*** DEBUG: getDocuments() SUCCESS ***" << std::endl;
+        std::cerr << "*** DEBUG: Documents JSON: " << OUStringToOString(sDocumentsJson, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+        
         parseDocumentsJson(sDocumentsJson);
         updateDocumentsList();
         
         if (mDocuments.empty())
         {
+            std::cerr << "*** DEBUG: No documents found after parsing ***" << std::endl;
             mxStatusLabel->set_label("No documents found in your LibreCloud storage.");
         }
         else
         {
+            std::cerr << "*** DEBUG: Found " << mDocuments.size() << " documents ***" << std::endl;
             OUString sMessage = "Found " + OUString::number(mDocuments.size()) + " document(s) in your LibreCloud storage.";
             mxStatusLabel->set_label(sMessage);
         }
     }
     else
     {
+        std::cerr << "*** DEBUG: getDocuments() FAILED ***" << std::endl;
         mxStatusLabel->set_label("Failed to load cloud documents. Please try again.");
         mDocuments.clear();
         updateDocumentsList();
@@ -308,7 +338,15 @@ IMPL_LINK_NOARG(CloudFilesDialog, LoginClickHdl, weld::Button&, void)
 
 IMPL_LINK_NOARG(CloudFilesDialog, RefreshClickHdl, weld::Button&, void)
 {
+    std::cerr << "*** DEBUG: Refresh button clicked ***" << std::endl;
     updateAuthenticationStatus();
+    
+    // If authentication completed successfully, close the dialog so user can reopen it fresh
+    if (mpAuthHandler && mpAuthHandler->isAuthenticated() && !mpAuthHandler->isAuthInProgress())
+    {
+        std::cerr << "*** DEBUG: Authentication complete, closing dialog ***" << std::endl;
+        m_xDialog->response(RET_CANCEL); // Close dialog, user can reopen to see documents
+    }
 }
 
 IMPL_LINK_NOARG(CloudFilesDialog, OpenClickHdl, weld::Button&, void)

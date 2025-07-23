@@ -6,9 +6,13 @@ const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-for-developme
 export interface DesktopJWTPayload {
   userId: string;
   email: string;
+  firstName?: string;
+  lastName?: string;
   iat: number;
   exp: number;
   type: 'desktop';
+  iss?: string;
+  aud?: string;
 }
 
 export function generateDesktopJWT(userId: string, email: string): string {
@@ -27,7 +31,44 @@ export function generateDesktopJWT(userId: string, email: string): string {
 
 export function verifyDesktopJWT(token: string): DesktopJWTPayload | null {
   try {
-    // First, try to decode without verification to check if it's our desktop token format
+    // First, try to decode as base64 (Phase 4 desktop token format)
+    try {
+      const base64Decoded = Buffer.from(token, 'base64').toString('utf-8');
+      const tokenData = JSON.parse(base64Decoded);
+      
+      // Validate it's a desktop token with required fields
+      if (tokenData.type === 'desktop' && 
+          tokenData.userId && 
+          tokenData.email && 
+          tokenData.exp && 
+          tokenData.iat) {
+        
+        // Check if token is expired
+        const now = Math.floor(Date.now() / 1000);
+        if (tokenData.exp < now) {
+          console.log('Desktop token expired');
+          return null;
+        }
+        
+        // Check issuer and audience if present
+        if (tokenData.iss && tokenData.iss !== 'libre-cloud-app') {
+          console.log('Invalid token issuer');
+          return null;
+        }
+        
+        if (tokenData.aud && tokenData.aud !== 'libre-cloud-desktop') {
+          console.log('Invalid token audience');
+          return null;
+        }
+        
+        console.log('Base64 desktop token validated successfully for user:', tokenData.userId);
+        return tokenData as DesktopJWTPayload;
+      }
+    } catch (base64Error) {
+      // Not a valid base64 token, try JWT parsing
+    }
+    
+    // Fallback: try to decode as JWT token (old format)
     const unverifiedDecoded = jwt.decode(token);
     
     // If it's not an object or doesn't have our desktop token structure, skip validation
@@ -35,18 +76,20 @@ export function verifyDesktopJWT(token: string): DesktopJWTPayload | null {
       return null;
     }
     
-    // Now verify the token since it looks like ours
+    // Now verify the JWT token since it looks like ours
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: 'libre-cloud-app',
       audience: 'libre-cloud-desktop',
     });
 
     if (typeof decoded === 'object' && decoded.type === 'desktop') {
+      console.log('JWT desktop token validated successfully');
       return decoded as DesktopJWTPayload;
     }
 
     return null;
   } catch (error) {
+    console.log('Token validation failed:', error);
     // Silently fail for JWT verification errors to allow fallback to Clerk
     return null;
   }
