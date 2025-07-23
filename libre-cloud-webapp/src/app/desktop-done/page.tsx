@@ -1,6 +1,13 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+
+const dynamoClient = new DynamoDBClient({
+  region: process.env.AWS_REGION,
+});
+const docClient = DynamoDBDocumentClient.from(dynamoClient);
 
 interface DesktopDonePageProps {
   searchParams: Promise<{
@@ -40,6 +47,30 @@ export default async function DesktopDonePage({ searchParams }: DesktopDonePageP
         </div>
       </div>
     );
+  }
+
+  // Update the nonce status in DynamoDB with user information
+  try {
+    await docClient.send(new UpdateCommand({
+      TableName: process.env.DYNAMODB_DESKTOP_LOGIN_TABLE_NAME,
+      Key: { nonce },
+      UpdateExpression: 'SET #status = :ready, userId = :userId, #data = :userData',
+      ExpressionAttributeNames: {
+        '#status': 'status',
+        '#data': 'data'
+      },
+      ExpressionAttributeValues: {
+        ':ready': 'ready',
+        ':userId': userId,
+        ':userData': {
+          email: user?.emailAddresses[0]?.emailAddress || '',
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+        }
+      }
+    }));
+  } catch (error) {
+    console.error('Error updating nonce status:', error);
   }
 
   return (
