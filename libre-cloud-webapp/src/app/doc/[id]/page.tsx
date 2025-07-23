@@ -33,7 +33,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
                 ← Back to Dashboard
               </Link>
               <h1 className="text-xl font-bold text-gray-900">
-                Document: {id}
+                Document Editor
               </h1>
             </div>
             

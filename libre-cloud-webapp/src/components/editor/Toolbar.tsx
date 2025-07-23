@@ -82,7 +82,7 @@ export default function Toolbar({ editor, onSave, isSaving = false, isDirty = fa
             type="button"
             onClick={onSave}
             disabled={!isDirty || isSaving}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>

@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
@@ -102,6 +102,50 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
 
     return NextResponse.json(
       { error: 'Failed to update document metadata' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest, context: RouteParams) {
+  try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id: documentId } = await context.params;
+
+    if (!documentId) {
+      return NextResponse.json({ error: 'Document ID is required' }, { status: 400 });
+    }
+
+    // Get document from DynamoDB
+    const command = new GetCommand({
+      TableName: process.env.DYNAMODB_DOCUMENTS_TABLE_NAME,
+      Key: {
+        userId: userId,
+        docId: documentId,
+      },
+    });
+
+    const result = await docClient.send(command);
+
+    if (!result.Item) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      document: result.Item,
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching document metadata:', error);
+
+    return NextResponse.json(
+      { error: 'Failed to fetch document metadata' },
       { status: 500 }
     );
   }

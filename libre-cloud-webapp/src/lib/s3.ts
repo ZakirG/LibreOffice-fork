@@ -103,6 +103,7 @@ const ALLOWED_DOCUMENT_TYPES = [
   'application/pdf', // .pdf
   'text/plain', // .txt
   'text/rtf', // .rtf
+  'application/json', // .slate (Slate editor documents)
   
   // Audio formats (for the music feature)
   'audio/mpeg', // .mp3
