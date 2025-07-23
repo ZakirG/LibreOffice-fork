@@ -15,6 +15,8 @@
 #include <sal/log.hxx>
 #include <tools/json_writer.hxx>
 #include <comphelper/string.hxx>
+#include <iostream>
+#include <cstdio>
 
 namespace
 {
@@ -86,19 +88,39 @@ void CloudApiClient::setJwtToken(const OUString& sToken)
 
 bool CloudApiClient::initDesktopAuth(OUString& rsNonce, OUString& rsLoginUrl)
 {
+    std::cerr << "*** DEBUG: CloudApiClient::initDesktopAuth() called ***" << std::endl;
+    SAL_WARN("sfx.control", "=== CloudApiClient::initDesktopAuth() called ===");
+    
     if (!m_pCurl)
+    {
+        std::cerr << "*** DEBUG: m_pCurl is NULL ***" << std::endl;
+        SAL_WARN("sfx.control", "initDesktopAuth failed: m_pCurl is null");
         return false;
+    }
 
     OUString sUrl = m_sBaseUrl + "/api/desktop-init";
     OUString sResponse;
     long nResponseCode = 0;
 
+    std::cerr << "*** DEBUG: About to POST to: " << OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    SAL_WARN("sfx.control", "Sending POST request to: " << sUrl);
+
     // Empty POST body
     if (!httpPost(sUrl, "", sResponse, &nResponseCode))
+    {
+        std::cerr << "*** DEBUG: httpPost FAILED ***" << std::endl;
+        SAL_WARN("sfx.control", "httpPost failed for desktop-init");
         return false;
+    }
+
+    std::cerr << "*** DEBUG: HTTP response code: " << nResponseCode << " ***" << std::endl;
+    std::cerr << "*** DEBUG: HTTP response body: " << OUStringToOString(sResponse, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    SAL_WARN("sfx.control", "desktop-init response code: " << nResponseCode);
+    SAL_WARN("sfx.control", "desktop-init response body: " << sResponse);
 
     if (nResponseCode != 200)
     {
+        std::cerr << "*** DEBUG: Non-200 response code ***" << std::endl;
         SAL_WARN("sfx.control", "Desktop auth init failed with code: " << nResponseCode);
         return false;
     }
@@ -107,36 +129,63 @@ bool CloudApiClient::initDesktopAuth(OUString& rsNonce, OUString& rsLoginUrl)
     rsNonce = extractJsonValue(sResponse, "nonce");
     rsLoginUrl = extractJsonValue(sResponse, "loginUrl");
 
-    return !rsNonce.isEmpty() && !rsLoginUrl.isEmpty();
+    std::cerr << "*** DEBUG: Extracted nonce: " << OUStringToOString(rsNonce, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    std::cerr << "*** DEBUG: Extracted loginUrl: " << OUStringToOString(rsLoginUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    SAL_WARN("sfx.control", "Extracted nonce: " << rsNonce);
+    SAL_WARN("sfx.control", "Extracted loginUrl: " << rsLoginUrl);
+
+    bool bSuccess = !rsNonce.isEmpty() && !rsLoginUrl.isEmpty();
+    std::cerr << "*** DEBUG: initDesktopAuth result: " << (bSuccess ? "SUCCESS" : "FAILED") << " ***" << std::endl;
+    SAL_WARN("sfx.control", "initDesktopAuth result: " << (bSuccess ? "SUCCESS" : "FAILED"));
+    
+    return bSuccess;
 }
 
 bool CloudApiClient::pollForToken(const OUString& sNonce, OUString& rsToken)
 {
     if (!m_pCurl || sNonce.isEmpty())
+    {
+        SAL_WARN("sfx.control", "CloudApiClient::pollForToken - Invalid state: curl=" << (m_pCurl ? "OK" : "NULL") << ", nonce empty=" << sNonce.isEmpty());
         return false;
+    }
 
     OUString sUrl = m_sBaseUrl + "/api/desktop-token?nonce=" + sNonce;
     OUString sResponse;
     long nResponseCode = 0;
 
+    SAL_WARN("sfx.control", "CloudApiClient polling URL: " << sUrl);
+
     if (!httpGet(sUrl, sResponse, &nResponseCode))
+    {
+        SAL_WARN("sfx.control", "CloudApiClient::pollForToken - HTTP request failed");
         return false;
+    }
+
+    SAL_WARN("sfx.control", "CloudApiClient got response code: " << nResponseCode);
+    SAL_WARN("sfx.control", "CloudApiClient response body: " << sResponse);
 
     if (nResponseCode == 200)
     {
         // Authentication completed, extract token
         rsToken = extractJsonValue(sResponse, "token");
+        std::cerr << "*** DEBUG: Raw token extracted: " << OUStringToOString(rsToken, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+        SAL_WARN("sfx.control", "CloudApiClient extracted token, empty=" << rsToken.isEmpty());
+        if (!rsToken.isEmpty())
+        {
+            SAL_WARN("sfx.control", "CloudApiClient token preview: " << rsToken.copy(0, std::min(50, rsToken.getLength())));
+        }
         return !rsToken.isEmpty();
     }
     else if (nResponseCode == 202)
     {
         // Still pending
+        SAL_WARN("sfx.control", "CloudApiClient - Authentication still pending");
         return false;
     }
     else
     {
         // Error or not found
-        SAL_WARN("sfx.control", "Token poll failed with code: " << nResponseCode);
+        SAL_WARN("sfx.control", "CloudApiClient - Token poll failed with code: " << nResponseCode << ", response: " << sResponse);
         return false;
     }
 }

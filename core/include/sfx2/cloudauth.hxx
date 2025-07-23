@@ -111,7 +111,7 @@ private:
     void openBrowser(const OUString& sUrl);
 
     /**
-     * Validate JWT token format and expiration
+     * Validate JWT token format
      * @param sToken JWT token to validate
      * @return true if token is valid
      */
@@ -120,6 +120,7 @@ private:
     // Static callback methods for UI messages
     DECL_STATIC_LINK(CloudAuthHandler, ShowSuccessMessage, void*, void);
     DECL_STATIC_LINK(CloudAuthHandler, ShowErrorMessage, void*, void);
+    DECL_STATIC_LINK(CloudAuthHandler, ShowValidationErrorMessage, void*, void);
     DECL_STATIC_LINK(CloudAuthHandler, ShowTimeoutMessage, void*, void);
 };
 
