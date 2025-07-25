@@ -1166,16 +1166,41 @@ void BackingWindow::handleCloudDocumentOpening(const OUString& sCloudUrl)
                                 // Store the cloud document ID as a custom property
                                 css::uno::Reference<css::beans::XPropertyContainer> xUserDefinedProps = xDocProps->getUserDefinedProperties();
                                 if (xUserDefinedProps.is()) {
+                                    // Determine original file extension and content type from filename
+                                    OUString sFileExtension, sContentType;
+                                    if (sOriginalFileName.endsWith(".txt")) {
+                                        sFileExtension = ".txt";
+                                        sContentType = "text/plain";
+                                    } else if (sOriginalFileName.endsWith(".odt")) {
+                                        sFileExtension = ".odt";
+                                        sContentType = "application/vnd.oasis.opendocument.text";
+                                    } else if (sOriginalFileName.endsWith(".docx")) {
+                                        sFileExtension = ".docx";
+                                        sContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                                    } else if (sOriginalFileName.endsWith(".pdf")) {
+                                        sFileExtension = ".pdf";
+                                        sContentType = "application/pdf";
+                                    } else {
+                                        // Default to ODF if unknown
+                                        sFileExtension = ".odt";
+                                        sContentType = "application/vnd.oasis.opendocument.text";
+                                    }
+                                    
                                     xUserDefinedProps->addProperty("CloudDocumentId", css::beans::PropertyAttribute::REMOVABLE, css::uno::Any(sDocumentId));
                                     xUserDefinedProps->addProperty("CloudOriginalFileName", css::beans::PropertyAttribute::REMOVABLE, css::uno::Any(sOriginalFileName));
+                                    xUserDefinedProps->addProperty("CloudOriginalFileExtension", css::beans::PropertyAttribute::REMOVABLE, css::uno::Any(sFileExtension));
+                                    xUserDefinedProps->addProperty("CloudOriginalContentType", css::beans::PropertyAttribute::REMOVABLE, css::uno::Any(sContentType));
+                                    
                                     std::cerr << "*** CLOUD DEBUG: Stored cloud document ID: " << sDocumentId << std::endl;
                                     std::cerr << "*** CLOUD DEBUG: Stored original filename: " << sOriginalFileName << std::endl;
+                                    std::cerr << "*** CLOUD DEBUG: Stored original extension: " << sFileExtension << std::endl;
+                                    std::cerr << "*** CLOUD DEBUG: Stored original content type: " << sContentType << std::endl;
                                 }
                             }
                         }
                     } catch (const css::uno::Exception& e) {
-                        std::cerr << "*** CLOUD DEBUG: Failed to store cloud document ID: " << e.Message << std::endl;
-                        // Don't fail the document opening if we can't store the ID
+                        std::cerr << "*** CLOUD DEBUG: Failed to store cloud document properties: " << e.Message << std::endl;
+                        // Don't fail the document opening if we can't store the properties
                     }
                 }
                 

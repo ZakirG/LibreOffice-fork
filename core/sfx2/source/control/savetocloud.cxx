@@ -88,8 +88,9 @@ bool SaveToCloudHandler::Execute(SfxRequest& rReq)
     }
 
     // Check if this document was originally opened from cloud
-    OUString sExistingCloudDocId, sOriginalFileName;
-    bool bIsCloudDocument = getExistingCloudDocumentId(sExistingCloudDocId, sOriginalFileName);
+    OUString sExistingCloudDocId, sOriginalFileName, sOriginalExtension, sOriginalContentType;
+    bool bIsCloudDocument = getExistingCloudDocumentId(sExistingCloudDocId, sOriginalFileName, 
+                                                       sOriginalExtension, sOriginalContentType);
     
     sfx2::SaveToCloudResult aResult;
     
@@ -107,8 +108,17 @@ bool SaveToCloudHandler::Execute(SfxRequest& rReq)
             std::cerr << "*** CLOUD DEBUG: Using current document title: " << aResult.fileName << std::endl;
         }
         
-        aResult.fileExtension = ".odt"; // Default extension
-        aResult.contentType = "application/vnd.oasis.opendocument.text"; // Default content type
+        // Use original file format if available, otherwise default to ODF
+        if (!sOriginalExtension.isEmpty() && !sOriginalContentType.isEmpty()) {
+            aResult.fileExtension = sOriginalExtension;
+            aResult.contentType = sOriginalContentType;
+            std::cerr << "*** CLOUD DEBUG: Using original format: " << sOriginalExtension << " (" << sOriginalContentType << ")" << std::endl;
+        } else {
+            aResult.fileExtension = ".odt";
+            aResult.contentType = "application/vnd.oasis.opendocument.text";
+            std::cerr << "*** CLOUD DEBUG: Using default ODF format" << std::endl;
+        }
+        
         aResult.cancelled = false;
         
         // Store the existing doc ID for later use
@@ -402,7 +412,8 @@ bool SaveToCloudHandler::getDocumentDataWithFormat(std::vector<char>& rDocumentD
     }
 }
 
-bool SaveToCloudHandler::getExistingCloudDocumentId(OUString& rsCloudDocId, OUString& rsOriginalFileName)
+bool SaveToCloudHandler::getExistingCloudDocumentId(OUString& rsCloudDocId, OUString& rsOriginalFileName, 
+                                                   OUString& rsOriginalExtension, OUString& rsOriginalContentType)
 {
     if (!m_pObjectShell)
         return false;
@@ -433,12 +444,14 @@ bool SaveToCloudHandler::getExistingCloudDocumentId(OUString& rsCloudDocId, OUSt
             return false;
             
         css::uno::Any aDocIdValue = xPropertySet->getPropertyValue("CloudDocumentId");
-        css::uno::Any aFileNameValue;
+        css::uno::Any aFileNameValue, aExtensionValue, aContentTypeValue;
         
         try {
             aFileNameValue = xPropertySet->getPropertyValue("CloudOriginalFileName");
+            aExtensionValue = xPropertySet->getPropertyValue("CloudOriginalFileExtension");
+            aContentTypeValue = xPropertySet->getPropertyValue("CloudOriginalContentType");
         } catch (const css::uno::Exception&) {
-            // CloudOriginalFileName might not exist for older documents
+            // These properties might not exist for older documents
         }
         
         if (aDocIdValue.hasValue())
@@ -447,9 +460,17 @@ bool SaveToCloudHandler::getExistingCloudDocumentId(OUString& rsCloudDocId, OUSt
             if (aFileNameValue.hasValue()) {
                 aFileNameValue >>= rsOriginalFileName;
             }
+            if (aExtensionValue.hasValue()) {
+                aExtensionValue >>= rsOriginalExtension;
+            }
+            if (aContentTypeValue.hasValue()) {
+                aContentTypeValue >>= rsOriginalContentType;
+            }
             
             std::cerr << "*** CLOUD DEBUG: Found existing cloud document ID: " << rsCloudDocId << std::endl;
             std::cerr << "*** CLOUD DEBUG: Found original filename: " << rsOriginalFileName << std::endl;
+            std::cerr << "*** CLOUD DEBUG: Found original extension: " << rsOriginalExtension << std::endl;
+            std::cerr << "*** CLOUD DEBUG: Found original content type: " << rsOriginalContentType << std::endl;
             return !rsCloudDocId.isEmpty();
         }
     }

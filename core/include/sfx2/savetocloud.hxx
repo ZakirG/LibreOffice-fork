@@ -102,9 +102,12 @@ private:
      * Check if document has an existing cloud document ID (was opened from cloud)
      * @param rsCloudDocId [out] The existing cloud document ID if found
      * @param rsOriginalFileName [out] The original filename if found
+     * @param rsOriginalExtension [out] The original file extension if found
+     * @param rsOriginalContentType [out] The original content type if found
      * @return true if document was opened from cloud
      */
-    bool getExistingCloudDocumentId(OUString& rsCloudDocId, OUString& rsOriginalFileName);
+    bool getExistingCloudDocumentId(OUString& rsCloudDocId, OUString& rsOriginalFileName, 
+                                   OUString& rsOriginalExtension, OUString& rsOriginalContentType);
 
     /**
      * Upload document to cloud storage with improved error handling
