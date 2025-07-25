@@ -885,6 +885,55 @@ CPPUNIT_TEST_FIXTURE(SvdrawTest, testVisualSignResize)
     CPPUNIT_ASSERT_LESS(static_cast<sal_Int32>(10000), xShape->getSize().Width);
     CPPUNIT_ASSERT_LESS(static_cast<sal_Int32>(10000), xShape->getSize().Height);
 }
+
+CPPUNIT_TEST_FIXTURE(SvdrawTest, testAudioFileReshaping)
+{
+    // Test that audio files are automatically reshaped to a 4:1 aspect ratio
+    loadFromFile(u"writer_demo.docx");
+    SdrPage* pSdrPage = getFirstDrawPageWithAssert();
+    
+    // Create a new SdrMediaObj with a square rectangle
+    tools::Rectangle aSquareRect(0, 0, 1000, 1000); // 1:1 aspect ratio
+    auto pMediaObj = new SdrMediaObj(pSdrPage->getSdrModelFromSdrPage(), aSquareRect);
+    
+    // Verify initial geometry is square
+    tools::Rectangle aInitialRect = pMediaObj->getRectangle();
+    CPPUNIT_ASSERT_EQUAL(static_cast<tools::Long>(1000), aInitialRect.GetWidth());
+    CPPUNIT_ASSERT_EQUAL(static_cast<tools::Long>(1000), aInitialRect.GetHeight());
+    
+    // Set URL for an MP3 file
+    pMediaObj->setURL("file:///test/audio.mp3", u""_ustr);
+    
+    // Verify that the geometry has been adjusted to 6:1 aspect ratio and reduced height
+    tools::Rectangle aNewRect = pMediaObj->getRectangle();
+    tools::Long nExpectedHeight = std::max(static_cast<tools::Long>(1000) / 2, static_cast<tools::Long>(600)); // Height / 2, minimum 600
+    tools::Long nExpectedWidth = nExpectedHeight * 6; // 6:1 aspect ratio
+    CPPUNIT_ASSERT_EQUAL(nExpectedWidth, aNewRect.GetWidth()); 
+    CPPUNIT_ASSERT_EQUAL(nExpectedHeight, aNewRect.GetHeight()); // Reduced height
+    CPPUNIT_ASSERT_EQUAL(aInitialRect.Left(), aNewRect.Left()); // Same left position
+    CPPUNIT_ASSERT_EQUAL(aInitialRect.Top(), aNewRect.Top()); // Same top position
+    
+    // Test with WAV file
+    pMediaObj->setURL("file:///test/audio.wav", u""_ustr);
+    aNewRect = pMediaObj->getRectangle();
+    CPPUNIT_ASSERT_EQUAL(nExpectedWidth, aNewRect.GetWidth());
+    CPPUNIT_ASSERT_EQUAL(nExpectedHeight, aNewRect.GetHeight());
+    
+    // Test with M4A file
+    pMediaObj->setURL("file:///test/audio.m4a", u""_ustr);
+    aNewRect = pMediaObj->getRectangle();
+    CPPUNIT_ASSERT_EQUAL(nExpectedWidth, aNewRect.GetWidth());
+    CPPUNIT_ASSERT_EQUAL(nExpectedHeight, aNewRect.GetHeight());
+    
+    // Test with non-audio file (should not be reshaped)
+    tools::Rectangle aVideoRect(0, 0, 1000, 1000);
+    auto pVideoObj = new SdrMediaObj(pSdrPage->getSdrModelFromSdrPage(), aVideoRect);
+    pVideoObj->setURL("file:///test/video.mp4", u""_ustr);
+    
+    tools::Rectangle aVideoNewRect = pVideoObj->getRectangle();
+    CPPUNIT_ASSERT_EQUAL(static_cast<tools::Long>(1000), aVideoNewRect.GetWidth()); // Unchanged
+    CPPUNIT_ASSERT_EQUAL(static_cast<tools::Long>(1000), aVideoNewRect.GetHeight()); // Unchanged
+}
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

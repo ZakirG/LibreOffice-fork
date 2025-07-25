@@ -41,6 +41,20 @@
 
 using namespace ::com::sun::star;
 
+namespace {
+    // Helper function to check if a file extension corresponds to a supported audio format
+    bool isAudioFile(const OUString& rURL) {
+        if (rURL.isEmpty())
+            return false;
+            
+        sal_Int32 nLastDot = rURL.lastIndexOf('.');
+        if (nLastDot == -1 || nLastDot == rURL.getLength() - 1)
+            return false;
+            
+        OUString sExtension = rURL.copy(nLastDot + 1).toAsciiLowerCase();
+        return sExtension == "mp3" || sExtension == "wav" || sExtension == "m4a";
+    }
+}
 
 struct SdrMediaObj::Impl
 {
@@ -441,6 +455,29 @@ void SdrMediaObj::mediaPropertiesChanged( const ::avmedia::MediaItem& rNewProper
             m_xImpl->m_pTempFile.reset();
             m_xImpl->m_MediaProperties.setURL(url, u""_ustr, rNewProperties.getReferer());
         }
+        
+        // Check if this is an audio file and reshape the geometry accordingly
+        if (isAudioFile(url))
+        {
+            tools::Rectangle aCurrentRect = getRectangle();
+            if (!aCurrentRect.IsEmpty())
+            {
+                            // Make it smaller overall and less tall with a 6:1 aspect ratio
+            tools::Long nNewHeight = std::max(aCurrentRect.GetHeight() / 2, static_cast<tools::Long>(600)); // Reduce height by 2x, minimum 600 units
+            tools::Long nNewWidth = nNewHeight * 6; // 6:1 aspect ratio (even wider)
+                
+                // Keep the same top-left position, but adjust dimensions
+                tools::Rectangle aNewRect(
+                    aCurrentRect.Left(),
+                    aCurrentRect.Top(),
+                    aCurrentRect.Left() + nNewWidth,
+                    aCurrentRect.Top() + nNewHeight
+                );
+                
+                SetLogicRect(aNewRect);
+            }
+        }
+        
         bBroadcastChanged = true;
     }
 

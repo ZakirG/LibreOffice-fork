@@ -116,10 +116,25 @@ void ViewContactOfSdrMediaObj::createViewIndependentPrimitive2DSequence(drawingl
     const basegfx::BColor aBackgroundColor(67.0 / 255.0, 67.0 / 255.0, 67.0 / 255.0);
     const OUString& rURL(GetSdrMediaObj().getURL());
     const sal_uInt32 nPixelBorder(4);
+    
+    // Check if this is an audio file and skip the icon (6:1 aspect ratio rectangles)
+    auto isAudioFile = [](const OUString& rURL) -> bool {
+        if (rURL.isEmpty())
+            return false;
+        sal_Int32 nLastDot = rURL.lastIndexOf('.');
+        if (nLastDot == -1 || nLastDot == rURL.getLength() - 1)
+            return false;
+        OUString sExtension = rURL.copy(nLastDot + 1).toAsciiLowerCase();
+        return sExtension == "mp3" || sExtension == "wav" || sExtension == "m4a";
+    };
+    
+    // For audio files, use empty graphic to remove the music icon
+    const Graphic aSnapshot = isAudioFile(rURL) ? Graphic() : GetSdrMediaObj().getSnapshot();
+    
     const drawinglayer::primitive2d::Primitive2DReference xRetval(
         new drawinglayer::primitive2d::MediaPrimitive2D(
             aTransform, rURL, aBackgroundColor, nPixelBorder,
-            GetSdrMediaObj().getSnapshot()));
+            aSnapshot));
 
     rVisitor.visit(xRetval);
 }

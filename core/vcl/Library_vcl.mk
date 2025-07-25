@@ -57,6 +57,7 @@ $(eval $(call gb_Library_use_custom_headers,vcl,\
 ))
 
 $(eval $(call gb_Library_use_libraries,vcl,\
+    avmedia \
     basegfx \
     comphelper \
     cppu \
@@ -221,6 +222,7 @@ $(eval $(call gb_Library_add_exception_objects,vcl,\
     vcl/source/window/winproc \
     vcl/source/window/wrkwin \
     vcl/source/window/EnumContext \
+    vcl/source/control/audioplayer \
     vcl/source/control/button \
     vcl/source/control/calendar \
     vcl/source/control/combobox \
