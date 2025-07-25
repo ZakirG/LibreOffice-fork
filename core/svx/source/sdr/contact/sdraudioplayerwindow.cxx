@@ -23,8 +23,10 @@ SdrAudioPlayerWindow::SdrAudioPlayerWindow(vcl::Window* pParent, ViewObjectConta
     : vcl::Window(pParent, WB_CLIPCHILDREN)
     , mrViewObjectContactOfSdrMediaObj(rViewObjContact)
 {
+    static int audioPlayerCount = 0;
+    ++audioPlayerCount;
     SAL_WARN("vcl.audio", "=== SdrAudioPlayerWindow CONSTRUCTOR CALLED ===");
-    fprintf(stderr, "*** DIRECT LOG: SdrAudioPlayerWindow constructor - audio player created! ***\n");
+    fprintf(stderr, "*** DIRECT LOG: SdrAudioPlayerWindow #%d constructor at %p - audio player created! ***\n", audioPlayerCount, this);
     SAL_WARN("vcl.audio", "Parent window: " << pParent);
     
     // Create the AudioPlayerControl as a child

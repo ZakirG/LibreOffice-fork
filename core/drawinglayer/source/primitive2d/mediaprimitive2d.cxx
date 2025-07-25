@@ -34,19 +34,7 @@ namespace drawinglayer::primitive2d
 {
         Primitive2DReference MediaPrimitive2D::create2DDecomposition(const geometry::ViewInformation2D& rViewInformation) const
         {
-            Primitive2DContainer xRetval;
-            xRetval.resize(1);
-
-            // create background object
-            basegfx::B2DPolygon aBackgroundPolygon(basegfx::utils::createUnitPolygon());
-            aBackgroundPolygon.transform(getTransform());
-            const Primitive2DReference xRefBackground(
-                new PolyPolygonColorPrimitive2D(
-                    basegfx::B2DPolyPolygon(aBackgroundPolygon),
-                    getBackgroundColor()));
-            xRetval[0] = xRefBackground;
-
-            // Check if this is an audio file
+            // Check if this is an audio file first
             auto isAudioFile = [](const OUString& rFilename) -> bool {
                 if (rFilename.isEmpty())
                     return false;
@@ -59,13 +47,29 @@ namespace drawinglayer::primitive2d
 
             if (!maFilename.isEmpty() && isAudioFile(maFilename))
             {
-                // For audio files, we'll create a special primitive that will eventually
-                // render using AudioPlayerControl. For now, we'll use the background only
-                // since the actual AudioPlayerControl integration happens at a higher level.
-                // The key is that we don't add a GraphicPrimitive2D here for audio files.
+                // For audio files, return empty primitive - no background, no graphics
+                // The SdrAudioPlayerWindow will handle ALL rendering at a higher level
+                fprintf(stderr, "*** DIRECT LOG: MediaPrimitive2D - RETURNING EMPTY primitive for audio file: %s ***\n", 
+                        maFilename.toUtf8().getStr());
+                return Primitive2DReference();
             }
-            else if(GraphicType::Bitmap == maSnapshot.GetType() || GraphicType::GdiMetafile == maSnapshot.GetType())
+
+            // For non-audio files, create normal background and graphics
+            Primitive2DContainer xRetval;
+            xRetval.resize(1);
+
+            // create background object
+            basegfx::B2DPolygon aBackgroundPolygon(basegfx::utils::createUnitPolygon());
+            aBackgroundPolygon.transform(getTransform());
+            const Primitive2DReference xRefBackground(
+                new PolyPolygonColorPrimitive2D(
+                    basegfx::B2DPolyPolygon(aBackgroundPolygon),
+                    getBackgroundColor()));
+            xRetval[0] = xRefBackground;
+            
+            if(GraphicType::Bitmap == maSnapshot.GetType() || GraphicType::GdiMetafile == maSnapshot.GetType())
             {
+                fprintf(stderr, "*** DIRECT LOG: MediaPrimitive2D - Creating graphic for non-audio file ***\n");
                 const GraphicObject aGraphicObject(maSnapshot);
                 const GraphicAttr aGraphicAttr;
                 xRetval.resize(2);

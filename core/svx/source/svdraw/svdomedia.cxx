@@ -94,8 +94,10 @@ SdrMediaObj::SdrMediaObj(
 :   SdrRectObj(rSdrModel, rRect)
     ,m_xImpl( new Impl )
 {
+    static int objectCount = 0;
+    ++objectCount;
     SAL_WARN("vcl.audio", "=== SdrMediaObj CONSTRUCTOR (2 params) with rect ===");
-    fprintf(stderr, "*** DIRECT LOG: SdrMediaObj created with rectangle ***\n");
+    fprintf(stderr, "*** DIRECT LOG: SdrMediaObj #%d created with rectangle at %p ***\n", objectCount, this);
     
     osl_atomic_increment(&m_refCount);
 

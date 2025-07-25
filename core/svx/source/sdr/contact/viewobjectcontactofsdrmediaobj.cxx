@@ -35,7 +35,10 @@ ViewObjectContactOfSdrMediaObj::ViewObjectContactOfSdrMediaObj( ObjectContact& r
                                                                 const ::avmedia::MediaItem& rMediaItem ) :
     ViewObjectContactOfSdrObj( rObjectContact, rViewContact )
 {
+    static int viewObjectCount = 0;
+    ++viewObjectCount;
     SAL_WARN("vcl.audio", "=== ViewObjectContactOfSdrMediaObj CONSTRUCTOR CALLED ===");
+    fprintf(stderr, "*** DIRECT LOG: ViewObjectContactOfSdrMediaObj #%d created at %p ***\n", viewObjectCount, this);
     
 #if HAVE_FEATURE_AVMEDIA
     vcl::Window* pWindow = getWindow();
