@@ -28,6 +28,10 @@
 #include <com/sun/star/embed/ElementModes.hpp>
 #include <com/sun/star/frame/XStorable.hpp>
 #include <com/sun/star/beans/PropertyValue.hpp>
+#include <com/sun/star/beans/XPropertyContainer.hpp>
+#include <com/sun/star/beans/XPropertySet.hpp>
+#include <com/sun/star/document/XDocumentPropertiesSupplier.hpp>
+#include <com/sun/star/document/XDocumentProperties.hpp>
 #include <com/sun/star/io/IOException.hpp>
 #include <rtl/ustrbuf.hxx>
 #include <sal/log.hxx>
@@ -83,20 +87,53 @@ bool SaveToCloudHandler::Execute(SfxRequest& rReq)
         return false;
     }
 
-    // Show Save to Cloud dialog to get user preferences
-    OUString sDocumentTitle = m_pObjectShell->GetTitle();
-    sfx2::SaveToCloudDialog aDlg(nullptr, sDocumentTitle);
+    // Check if this document was originally opened from cloud
+    OUString sExistingCloudDocId, sOriginalFileName;
+    bool bIsCloudDocument = getExistingCloudDocumentId(sExistingCloudDocId, sOriginalFileName);
     
-    if (aDlg.run() != RET_OK)
+    sfx2::SaveToCloudResult aResult;
+    
+    if (bIsCloudDocument && !sExistingCloudDocId.isEmpty())
     {
-        // User cancelled the dialog
-        return false;
+        // This is a cloud document being updated - skip dialog and use existing ID
+        std::cerr << "*** CLOUD DEBUG: Updating existing cloud document: " << sExistingCloudDocId << std::endl;
+        
+        // Use original filename if available, otherwise fall back to current title
+        if (!sOriginalFileName.isEmpty()) {
+            aResult.fileName = sOriginalFileName;
+            std::cerr << "*** CLOUD DEBUG: Using stored original filename: " << sOriginalFileName << std::endl;
+        } else {
+            aResult.fileName = m_pObjectShell->GetTitle();
+            std::cerr << "*** CLOUD DEBUG: Using current document title: " << aResult.fileName << std::endl;
+        }
+        
+        aResult.fileExtension = ".odt"; // Default extension
+        aResult.contentType = "application/vnd.oasis.opendocument.text"; // Default content type
+        aResult.cancelled = false;
+        
+        // Store the existing doc ID for later use
+        m_sCloudDocumentId = sExistingCloudDocId;
     }
-    
-    const sfx2::SaveToCloudResult& aResult = aDlg.getResult();
-    if (aResult.cancelled)
+    else
     {
-        return false;
+        // New document or not from cloud - show Save to Cloud dialog
+        OUString sDocumentTitle = m_pObjectShell->GetTitle();
+        sfx2::SaveToCloudDialog aDlg(nullptr, sDocumentTitle);
+        
+        if (aDlg.run() != RET_OK)
+        {
+            // User cancelled the dialog
+            return false;
+        }
+        
+        aResult = aDlg.getResult();
+        if (aResult.cancelled)
+        {
+            return false;
+        }
+        
+        // Clear the cloud document ID since this is a new save
+        m_sCloudDocumentId.clear();
     }
 
     m_bOperationInProgress = true;
@@ -365,6 +402,66 @@ bool SaveToCloudHandler::getDocumentDataWithFormat(std::vector<char>& rDocumentD
     }
 }
 
+bool SaveToCloudHandler::getExistingCloudDocumentId(OUString& rsCloudDocId, OUString& rsOriginalFileName)
+{
+    if (!m_pObjectShell)
+        return false;
+        
+    try
+    {
+        // Get the model from the object shell
+        css::uno::Reference<css::frame::XModel> xModel = m_pObjectShell->GetModel();
+        if (!xModel.is())
+            return false;
+            
+        // Get document properties
+        css::uno::Reference<css::document::XDocumentPropertiesSupplier> xDocPropsSupplier(xModel, css::uno::UNO_QUERY);
+        if (!xDocPropsSupplier.is())
+            return false;
+            
+        css::uno::Reference<css::document::XDocumentProperties> xDocProps = xDocPropsSupplier->getDocumentProperties();
+        if (!xDocProps.is())
+            return false;
+            
+        // Check for CloudDocumentId custom property
+        css::uno::Reference<css::beans::XPropertyContainer> xUserDefinedProps = xDocProps->getUserDefinedProperties();
+        if (!xUserDefinedProps.is())
+            return false;
+            
+        css::uno::Reference<css::beans::XPropertySet> xPropertySet(xUserDefinedProps, css::uno::UNO_QUERY);
+        if (!xPropertySet.is())
+            return false;
+            
+        css::uno::Any aDocIdValue = xPropertySet->getPropertyValue("CloudDocumentId");
+        css::uno::Any aFileNameValue;
+        
+        try {
+            aFileNameValue = xPropertySet->getPropertyValue("CloudOriginalFileName");
+        } catch (const css::uno::Exception&) {
+            // CloudOriginalFileName might not exist for older documents
+        }
+        
+        if (aDocIdValue.hasValue())
+        {
+            aDocIdValue >>= rsCloudDocId;
+            if (aFileNameValue.hasValue()) {
+                aFileNameValue >>= rsOriginalFileName;
+            }
+            
+            std::cerr << "*** CLOUD DEBUG: Found existing cloud document ID: " << rsCloudDocId << std::endl;
+            std::cerr << "*** CLOUD DEBUG: Found original filename: " << rsOriginalFileName << std::endl;
+            return !rsCloudDocId.isEmpty();
+        }
+    }
+    catch (const css::uno::Exception& e)
+    {
+        std::cerr << "*** CLOUD DEBUG: Exception while checking for cloud document properties: " << e.Message << std::endl;
+        // Not an error - just means it's not a cloud document
+    }
+    
+    return false;
+}
+
 bool SaveToCloudHandler::uploadToCloud(const std::vector<char>& rDocumentData, const OUString& sFileName, const OUString& sContentType)
 {
     if (!m_pApiClient)
@@ -375,15 +472,35 @@ bool SaveToCloudHandler::uploadToCloud(const std::vector<char>& rDocumentData, c
 
     try
     {
-        // Request presigned URL for upload
         OUString sPresignedUrl, sDocId;
-        if (!m_pApiClient->requestPresignedUrl("put", sFileName, sContentType, sPresignedUrl, sDocId))
+        
+        if (!m_sCloudDocumentId.isEmpty())
         {
-            SAL_WARN("sfx.control", "Failed to get presigned URL for upload");
-            return false;
+            // Update existing cloud document
+            std::cerr << "*** CLOUD DEBUG: Updating existing document with ID: " << m_sCloudDocumentId << std::endl;
+            sDocId = m_sCloudDocumentId;
+            
+            if (!m_pApiClient->requestPresignedUrlForDocument(sDocId, "put", sPresignedUrl))
+            {
+                SAL_WARN("sfx.control", "Failed to get presigned URL for existing document update");
+                return false;
+            }
+            
+            std::cerr << "*** CLOUD DEBUG: Got presigned URL for document update" << std::endl;
         }
-
-        SAL_WARN("sfx.control", "Got presigned URL for upload, docId: " << sDocId);
+        else
+        {
+            // Create new cloud document
+            std::cerr << "*** CLOUD DEBUG: Creating new cloud document" << std::endl;
+            
+            if (!m_pApiClient->requestPresignedUrl("put", sFileName, sContentType, sPresignedUrl, sDocId))
+            {
+                SAL_WARN("sfx.control", "Failed to get presigned URL for new document");
+                return false;
+            }
+            
+            std::cerr << "*** CLOUD DEBUG: Got presigned URL for new document, docId: " << sDocId << std::endl;
+        }
 
         // Upload file to presigned URL
         OUString sUploadResponse;
@@ -408,13 +525,25 @@ bool SaveToCloudHandler::uploadToCloud(const std::vector<char>& rDocumentData, c
         // Calculate file size
         sal_Int64 nFileSize = static_cast<sal_Int64>(rDocumentData.size());
 
-        // Register document metadata
-        if (!m_pApiClient->registerDocument(sDocId, sFileName, nFileSize))
+        // Register document metadata only for new documents
+        if (m_sCloudDocumentId.isEmpty())
         {
-            SAL_WARN("sfx.control", "Failed to register document metadata");
-            return false;
+            // This is a new document, register its metadata
+            std::cerr << "*** CLOUD DEBUG: Registering new document metadata" << std::endl;
+            
+            if (!m_pApiClient->registerDocument(sDocId, sFileName, nFileSize))
+            {
+                SAL_WARN("sfx.control", "Failed to register document metadata");
+                return false;
+            }
+        }
+        else
+        {
+            // This is an update to existing document, no need to register
+            std::cerr << "*** CLOUD DEBUG: Skipping registration for existing document update" << std::endl;
         }
 
+        std::cerr << "*** CLOUD DEBUG: Document uploaded successfully, docId: " << sDocId << std::endl;
         SAL_WARN("sfx.control", "Document uploaded successfully, docId: " << sDocId);
         return true;
     }

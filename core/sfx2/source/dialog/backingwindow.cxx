@@ -71,6 +71,10 @@
 #include <com/sun/star/frame/XModel3.hpp>
 #include <com/sun/star/frame/XTitle.hpp>
 #include <com/sun/star/beans/PropertyValue.hpp>
+#include <com/sun/star/beans/XPropertyContainer.hpp>
+#include <com/sun/star/beans/PropertyAttribute.hpp>
+#include <com/sun/star/document/XDocumentPropertiesSupplier.hpp>
+#include <com/sun/star/document/XDocumentProperties.hpp>
 #include <com/sun/star/lang/XComponent.hpp>
 #include <rtl/uri.hxx>
 #include <unotools/tempfile.hxx>
@@ -1148,6 +1152,30 @@ void BackingWindow::handleCloudDocumentOpening(const OUString& sCloudUrl)
                                 std::cerr << "*** CLOUD DEBUG: Document title set via XModel to: " << sOriginalFileName << std::endl;
                             }
                         }
+                    }
+                }
+                
+                // Store the original document ID as a custom property so Save to Cloud can use it
+                css::uno::Reference<css::frame::XModel> xModel(xComponent, css::uno::UNO_QUERY);
+                if (xModel.is()) {
+                    try {
+                        css::uno::Reference<css::document::XDocumentPropertiesSupplier> xDocPropsSupplier(xModel, css::uno::UNO_QUERY);
+                        if (xDocPropsSupplier.is()) {
+                            css::uno::Reference<css::document::XDocumentProperties> xDocProps = xDocPropsSupplier->getDocumentProperties();
+                            if (xDocProps.is()) {
+                                // Store the cloud document ID as a custom property
+                                css::uno::Reference<css::beans::XPropertyContainer> xUserDefinedProps = xDocProps->getUserDefinedProperties();
+                                if (xUserDefinedProps.is()) {
+                                    xUserDefinedProps->addProperty("CloudDocumentId", css::beans::PropertyAttribute::REMOVABLE, css::uno::Any(sDocumentId));
+                                    xUserDefinedProps->addProperty("CloudOriginalFileName", css::beans::PropertyAttribute::REMOVABLE, css::uno::Any(sOriginalFileName));
+                                    std::cerr << "*** CLOUD DEBUG: Stored cloud document ID: " << sDocumentId << std::endl;
+                                    std::cerr << "*** CLOUD DEBUG: Stored original filename: " << sOriginalFileName << std::endl;
+                                }
+                            }
+                        }
+                    } catch (const css::uno::Exception& e) {
+                        std::cerr << "*** CLOUD DEBUG: Failed to store cloud document ID: " << e.Message << std::endl;
+                        // Don't fail the document opening if we can't store the ID
                     }
                 }
                 

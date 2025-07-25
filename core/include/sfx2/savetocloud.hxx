@@ -41,6 +41,9 @@ private:
     // Progress tracking
     bool m_bOperationInProgress;
     
+    // Cloud document tracking
+    OUString m_sCloudDocumentId;
+    
 public:
     /**
      * Constructor
@@ -94,6 +97,14 @@ private:
      * @return true if successful
      */
     bool uploadToCloud(const std::vector<char>& rDocumentData, const OUString& sFileName, const OUString& sContentType);
+
+    /**
+     * Check if document has an existing cloud document ID (was opened from cloud)
+     * @param rsCloudDocId [out] The existing cloud document ID if found
+     * @param rsOriginalFileName [out] The original filename if found
+     * @return true if document was opened from cloud
+     */
+    bool getExistingCloudDocumentId(OUString& rsCloudDocId, OUString& rsOriginalFileName);
 
     /**
      * Upload document to cloud storage with improved error handling
