@@ -13,6 +13,7 @@
 #include <sfx2/dllapi.h>
 #include <rtl/ustring.hxx>
 #include <map>
+#include <vector>
 
 struct curl_slist;
 typedef void CURL;
@@ -103,6 +104,23 @@ public:
      * @return true if successful
      */
     bool deleteDocument(const OUString& sDocId);
+
+    /**
+     * Request presigned URL for an existing document (by document ID)
+     * @param sDocId Document ID 
+     * @param sMode "get" for download, "put" for upload
+     * @param rsPresignedUrl [out] Presigned URL
+     * @return true if successful
+     */
+    bool requestPresignedUrlForDocument(const OUString& sDocId, const OUString& sMode, OUString& rsPresignedUrl);
+
+    /**
+     * Download document content from presigned URL
+     * @param sPresignedUrl Presigned URL to download from
+     * @param rDocumentData [out] Document binary data
+     * @return true if successful
+     */
+    bool downloadDocument(const OUString& sPresignedUrl, std::vector<char>& rDocumentData);
 
     /**
      * Upload binary data to URL (for presigned URL uploads)

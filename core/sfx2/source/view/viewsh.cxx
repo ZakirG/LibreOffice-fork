@@ -104,6 +104,7 @@
 #include <sfx2/ipclient.hxx>
 #include <sfx2/sfxsids.hrc>
 #include <sfx2/objface.hxx>
+#include <sfx2/cloudauth.hxx>
 #include <sfx2/lokhelper.hxx>
 #include <sfx2/lokcallback.hxx>
 #include <openuriexternally.hxx>
@@ -2239,6 +2240,28 @@ void SfxViewShell::ExecMisc_Impl( SfxRequest &rReq )
             SAL_WARN("sfx.debug", "=== END LOGIN TO CLOUD EXECUTION ===");
             break;
         }
+        case SID_LOGOUT_FROM_CLOUD:
+        {
+            SAL_WARN("sfx.debug", "=== LOGOUT FROM CLOUD EXECUTION ===");
+            SAL_WARN("sfx.debug", "SID_LOGOUT_FROM_CLOUD ExecMisc_Impl called!");
+            
+            // Call logout directly from CloudAuthHandler
+            try 
+            {
+                CloudAuthHandler::getInstance().logout();
+                SAL_WARN("sfx.debug", "Logout completed successfully");
+            }
+            catch (const std::exception& e)
+            {
+                SAL_WARN("sfx.debug", "Exception during logout: " << e.what());
+            }
+            catch (...)
+            {
+                SAL_WARN("sfx.debug", "Unknown exception during logout");
+            }
+            SAL_WARN("sfx.debug", "=== END LOGOUT FROM CLOUD EXECUTION ===");
+            break;
+        }
         case SID_SAVETOCLOUD:
         {
             // SUPER OBVIOUS EXECUTION LOG
@@ -2561,6 +2584,35 @@ void SfxViewShell::GetState_Impl( SfxItemSet &rSet )
                     SAL_WARN("sfx.debug", "LOGIN TO CLOUD should be ENABLED");
                 }
                 SAL_WARN("sfx.debug", "=== END LOGIN TO CLOUD STATE CHECK ===");
+                break;
+            }
+            case SID_LOGOUT_FROM_CLOUD:
+            {
+                SAL_WARN("sfx.debug", "=== LOGOUT FROM CLOUD STATE CHECK ===");
+                SAL_WARN("sfx.debug", "SID_LOGOUT_FROM_CLOUD GetState_Impl called!");
+                
+                // Enable logout only if user is authenticated
+                try 
+                {
+                    bool bAuthenticated = CloudAuthHandler::getInstance().isAuthenticated();
+                    SAL_WARN("sfx.debug", "User authenticated: " << (bAuthenticated ? "YES" : "NO"));
+                    
+                    if (!bAuthenticated || (pSh && pSh->isExportLocked()))
+                    {
+                        SAL_WARN("sfx.debug", "DISABLING LOGOUT FROM CLOUD - not authenticated or export locked");
+                        rSet.DisableItem(nSID);
+                    }
+                    else
+                    {
+                        SAL_WARN("sfx.debug", "LOGOUT FROM CLOUD should be ENABLED");
+                    }
+                }
+                catch (...)
+                {
+                    SAL_WARN("sfx.debug", "Exception checking auth status, disabling logout");
+                    rSet.DisableItem(nSID);
+                }
+                SAL_WARN("sfx.debug", "=== END LOGOUT FROM CLOUD STATE CHECK ===");
                 break;
             }
             case SID_SAVETOCLOUD:

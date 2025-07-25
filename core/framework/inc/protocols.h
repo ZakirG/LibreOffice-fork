@@ -53,6 +53,8 @@ namespace framework{
 #define SPECIALPROTOCOL_MAILTO            u"mailto:"
 // for sending news
 #define SPECIALPROTOCOL_NEWS              u"news:"
+// for cloud documents
+#define SPECIALPROTOCOL_CLOUD             u"cloud:"
 
 /** well known protocols */
 enum class EProtocol
@@ -65,7 +67,8 @@ enum class EProtocol
     Macro,
     Service,
     MailTo,
-    News
+    News,
+    Cloud
 };
 
 class ProtocolCheck
@@ -108,6 +111,9 @@ class ProtocolCheck
                 break;
             case EProtocol::News:
                 bRet = o3tl::starts_with(sURL, SPECIALPROTOCOL_NEWS);
+                break;
+            case EProtocol::Cloud:
+                bRet = o3tl::starts_with(sURL, SPECIALPROTOCOL_CLOUD);
                 break;
             default:
                 bRet = false;

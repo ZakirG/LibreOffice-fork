@@ -92,6 +92,8 @@
 #include <classes/taskcreator.hxx>
 #include <tools/fileutil.hxx>
 
+#include <loadenv/actionlockguard.hxx>
+
 constexpr OUString PROP_TYPES = u"Types"_ustr;
 constexpr OUString PROP_NAME = u"Name"_ustr;
 
@@ -568,6 +570,12 @@ LoadEnv::EContentType LoadEnv::classifyContent(const OUString&                  
       )
     {
         return E_UNSUPPORTED_CONTENT;
+    }
+
+    // Special handling for cloud:// URLs - they can be loaded
+    if (ProtocolCheck::isProtocol(sURL, EProtocol::Cloud))
+    {
+        return E_CAN_BE_LOADED;
     }
 
     // (ii) Some special URLs indicates a given input stream,
@@ -1159,13 +1167,13 @@ bool LoadEnv::impl_loadContent()
 
     if (xAsyncLoader.is())
     {
+        // SAFE -> -----------------------------------
+        osl::MutexGuard aWriteLock2(m_mutex);
         m_xAsynchronousJob = xAsyncLoader;
         rtl::Reference<LoadEnvListener> xListener = new LoadEnvListener(this);
-        aWriteLock.clear();
         // <- SAFE -----------------------------------
 
         xAsyncLoader->load(xTargetFrame, sURL, lDescriptor, xListener);
-
         return true;
     }
     else if (xSyncLoader.is())
@@ -1823,6 +1831,8 @@ void LoadEnv::impl_applyPersistentWindowState(const css::uno::Reference< css::aw
     catch(const css::uno::Exception&)
         {}
 }
+
+
 
 } // namespace framework
 

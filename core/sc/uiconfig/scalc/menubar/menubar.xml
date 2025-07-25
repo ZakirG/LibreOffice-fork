@@ -25,6 +25,9 @@
       <menu:menuitem menu:id=".uno:RecentFileList"/>
       <menu:menuitem menu:id=".uno:CloseDoc"/>
       <menu:menuseparator/>
+      <menu:menuitem menu:id=".uno:LoginToCloud" menu:style="text"/>
+      <menu:menuitem menu:id=".uno:LogoutFromCloud" menu:style="text"/>
+      <menu:menuseparator/>
       <menu:menuitem menu:id=".uno:AutoPilotMenu" menu:style="text"/>
       <menu:menu menu:id=".uno:TemplateMenu">
         <menu:menupopup>

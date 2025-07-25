@@ -39,6 +39,11 @@ interface View
         ExecMethod = ExecMisc_Impl ;
         StateMethod = GetState_Impl ;
     ]
+    SID_LOGOUT_FROM_CLOUD // ole(no) api(todo)
+    [
+        ExecMethod = ExecMisc_Impl ;
+        StateMethod = GetState_Impl ;
+    ]
     SID_SAVETOCLOUD // ole(no) api(todo)
     [
         ExecMethod = ExecMisc_Impl ;

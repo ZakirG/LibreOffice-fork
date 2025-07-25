@@ -19,6 +19,7 @@
 
 #include "backingwindow.hxx"
 #include <utility>
+#include <iostream>
 #include <vcl/event.hxx>
 #include <vcl/help.hxx>
 #include <vcl/ptrstyle.hxx>
@@ -63,6 +64,16 @@
 #include "backingwindow.hxx"
 #include <sfx2/cloudauth.hxx>
 #include <sfx2/cloudfilesdialog.hxx>
+#include <sfx2/cloudapi.hxx>
+
+#include <com/sun/star/frame/Desktop.hpp>
+#include <com/sun/star/frame/XModel2.hpp>
+#include <com/sun/star/frame/XModel3.hpp>
+#include <com/sun/star/beans/PropertyValue.hpp>
+#include <com/sun/star/lang/XComponent.hpp>
+#include <unotools/tempfile.hxx>
+#include <tools/stream.hxx>
+#include <comphelper/errcode.hxx>
 
 using namespace ::com::sun::star;
 using namespace ::com::sun::star::beans;
@@ -834,14 +845,64 @@ void BackingWindow::openCloudFilesDialog()
             OUString sDocumentUrl = aDialog.getSelectedDocumentUrl();
             if (!sDocumentUrl.isEmpty())
             {
-                // Open the selected cloud document
-                // For now, show a message with the document URL that would be opened
-                std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
-                    VclMessageType::Info, VclButtonsType::Ok,
-                    "Cloud document selected: " + sDocumentUrl + "\n\n"
-                    "Document opening functionality will be implemented in the next phase."));
-                xBox->set_title("LibreCloud Document Selected");
-                xBox->run();
+                // Check if this is a cloud:// URL and handle it specially
+                if (sDocumentUrl.startsWith("cloud://"))
+                {
+                    std::cerr << "*** CLOUD DEBUG: About to call handleCloudDocumentOpening with URL: " << sDocumentUrl << std::endl;
+                    try
+                    {
+                        handleCloudDocumentOpening(sDocumentUrl);
+                        std::cerr << "*** CLOUD DEBUG: handleCloudDocumentOpening completed successfully" << std::endl;
+                    }
+                    catch (const css::uno::Exception& e)
+                    {
+                        std::cerr << "*** CLOUD DEBUG: Exception in handleCloudDocumentOpening: " << e.Message << std::endl;
+                        SAL_WARN("sfx.dialog", "Exception opening cloud document: " << e.Message);
+                        std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+                            VclMessageType::Error, VclButtonsType::Ok,
+                            "An error occurred while opening the cloud document:\n" + e.Message));
+                        xBox->set_title("LibreCloud Document Error");
+                        xBox->run();
+                    }
+                }
+                else
+                {
+                    // Handle regular URLs through normal loading mechanism
+                    try
+                    {
+                        css::uno::Reference<css::frame::XDesktop2> xDesktop = css::frame::Desktop::create(
+                            ::comphelper::getProcessComponentContext());
+                        
+                        if (xDesktop.is())
+                        {
+                            css::uno::Sequence<css::beans::PropertyValue> aArgs;
+                            css::uno::Reference<css::lang::XComponent> xComponent = 
+                                xDesktop->loadComponentFromURL(sDocumentUrl, "_default", 0, aArgs);
+                            
+                            if (xComponent.is())
+                            {
+                                SAL_INFO("sfx.dialog", "Document opened successfully: " << sDocumentUrl);
+                            }
+                            else
+                            {
+                                std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+                                    VclMessageType::Warning, VclButtonsType::Ok,
+                                    "Failed to open the document. Please check your connection and try again."));
+                                xBox->set_title("Document Loading Failed");
+                                xBox->run();
+                            }
+                        }
+                    }
+                    catch (const css::uno::Exception& e)
+                    {
+                        SAL_WARN("sfx.dialog", "Exception opening document: " << e.Message);
+                        std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+                            VclMessageType::Error, VclButtonsType::Ok,
+                            "An error occurred while opening the document:\n" + e.Message));
+                        xBox->set_title("Document Error");
+                        xBox->run();
+                    }
+                }
             }
         }
     }
@@ -850,6 +911,308 @@ void BackingWindow::openCloudFilesDialog()
         std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
             VclMessageType::Error, VclButtonsType::Ok,
             "Failed to open cloud files dialog. Please try again later."));
+        xBox->set_title("LibreCloud Error");
+        xBox->run();
+    }
+}
+
+/**
+ * Handle opening of cloud documents from cloud:// URLs
+ * @param sCloudUrl URL in format "cloud://document-id"
+ */
+void BackingWindow::handleCloudDocumentOpening(const OUString& sCloudUrl)
+{
+    std::cerr << "*** CLOUD DEBUG: handleCloudDocumentOpening called with URL: " << sCloudUrl << std::endl;
+    SAL_INFO("sfx.dialog", "BackingWindow::handleCloudDocumentOpening called with URL: " << sCloudUrl);
+    
+    try
+    {
+        // Extract the document ID from the cloud:// URL
+        const OUString sPrefix = "cloud://";
+        if (!sCloudUrl.startsWith(sPrefix))
+        {
+            std::cerr << "*** CLOUD DEBUG: ERROR - Invalid cloud URL format: " << sCloudUrl << std::endl;
+            throw css::uno::RuntimeException("Invalid cloud URL format: " + sCloudUrl);
+        }
+        
+        OUString sDocumentId = sCloudUrl.copy(sPrefix.getLength());
+        if (sDocumentId.isEmpty())
+        {
+            std::cerr << "*** CLOUD DEBUG: ERROR - Empty document ID in cloud URL" << std::endl;
+            throw css::uno::RuntimeException("Empty document ID in cloud URL");
+        }
+        
+        std::cerr << "*** CLOUD DEBUG: Extracted document ID: " << sDocumentId << std::endl;
+        SAL_INFO("sfx.dialog", "Extracted document ID: " << sDocumentId);
+
+        // Get CloudAuthHandler instance
+        CloudAuthHandler& authHandler = CloudAuthHandler::getInstance();
+        
+        if (!authHandler.isAuthenticated())
+        {
+            SAL_WARN("sfx.dialog", "User not authenticated for cloud document access");
+            std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+                VclMessageType::Warning, VclButtonsType::Ok,
+                "You are not logged in to LibreCloud. Please log in first using File > Open Cloud Files."));
+            xBox->set_title("LibreCloud Authentication Required");
+            xBox->run();
+            return;
+        }
+        
+        // Get API client
+        CloudApiClient* pApiClient = authHandler.getApiClient();
+        if (!pApiClient)
+        {
+            throw css::uno::RuntimeException("No API client available");
+        }
+        
+        // Request presigned URL for document download
+        OUString sPresignedUrl;
+        if (!pApiClient->requestPresignedUrlForDocument(sDocumentId, "get", sPresignedUrl))
+        {
+            long nResponseCode = pApiClient->getLastResponseCode();
+            if (nResponseCode == 401)
+            {
+                SAL_WARN("sfx.dialog", "Authentication expired while accessing cloud document");
+                authHandler.clearExpiredToken();
+                std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+                    VclMessageType::Warning, VclButtonsType::Ok,
+                    "Your session has expired. Please log in again using File > Open Cloud Files."));
+                xBox->set_title("LibreCloud Session Expired");
+                xBox->run();
+                return;
+            }
+            else
+            {
+                throw css::uno::RuntimeException("Failed to get presigned URL for document download");
+            }
+        }
+        
+        SAL_INFO("sfx.dialog", "Got presigned URL for download");
+        
+        // Download document content
+        std::cerr << "*** CLOUD DEBUG: About to download document from presigned URL" << std::endl;
+        std::vector<char> aDocumentData;
+        bool bDownloadSuccess = pApiClient->downloadDocument(sPresignedUrl, aDocumentData);
+        std::cerr << "*** CLOUD DEBUG: downloadDocument() returned: " << (bDownloadSuccess ? "SUCCESS" : "FAILURE") << std::endl;
+        
+        if (!bDownloadSuccess)
+        {
+            std::cerr << "*** CLOUD DEBUG: ERROR - Failed to download document content" << std::endl;
+            throw css::uno::RuntimeException("Failed to download document content");
+        }
+        
+        std::cerr << "*** CLOUD DEBUG: Document downloaded successfully, size: " << aDocumentData.size() << " bytes" << std::endl;
+        SAL_INFO("sfx.dialog", "Document downloaded successfully, size: " << aDocumentData.size() << " bytes");
+        
+        // Create temporary file
+        utl::TempFileNamed aTempFile;
+        aTempFile.EnableKillingFile();
+        
+        // Write document data to temporary file
+        SvFileStream aOutStream(aTempFile.GetURL(), StreamMode::WRITE);
+        if (!aOutStream.IsOpen())
+        {
+            throw css::uno::RuntimeException("Failed to create temporary file for cloud document");
+        }
+        
+        aOutStream.WriteBytes(aDocumentData.data(), aDocumentData.size());
+        aOutStream.Close();
+        
+        if (aOutStream.GetError() != ERRCODE_NONE)
+        {
+            throw css::uno::RuntimeException("Failed to write cloud document to temporary file");
+        }
+        
+        SAL_INFO("sfx.dialog", "Cloud document written to temporary file: " << aTempFile.GetURL());
+        
+        // Add extensive debugging for file validation
+        OUString sTempFileURL = aTempFile.GetURL();
+        OUString sTempFileName = aTempFile.GetFileName();
+        SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Temp file URL: " << sTempFileURL);
+        SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Temp file name: " << sTempFileName);
+        SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Document data size: " << aDocumentData.size() << " bytes");
+        
+        // Check if file exists and is readable
+        try {
+            SvFileStream aTestStream(sTempFileURL, StreamMode::READ);
+            if (aTestStream.IsOpen()) {
+                sal_uInt64 nFileSize = aTestStream.TellEnd();
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Temp file exists and is readable, size: " << nFileSize << " bytes");
+                aTestStream.Close();
+            } else {
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: ERROR - Temp file cannot be opened for reading!");
+            }
+        } catch (...) {
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Exception while checking temp file!");
+        }
+        
+        // Open the temporary file using normal LibreOffice loading
+        try 
+        {
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Starting cloud document loading process");
+            
+            css::uno::Reference<css::frame::XDesktop2> xDesktop = css::frame::Desktop::create(
+                ::comphelper::getProcessComponentContext());
+            
+            if (!xDesktop.is())
+            {
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: ERROR - Failed to get desktop service");
+                throw css::uno::RuntimeException("Failed to get desktop service");
+            }
+            
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Desktop service created successfully");
+            
+            // Prepare loading arguments to help with different file types
+            css::uno::Sequence<css::beans::PropertyValue> aArgs(3);
+            auto pArgs = aArgs.getArray();
+            pArgs[0].Name = "Hidden";
+            pArgs[0].Value <<= false;
+            pArgs[1].Name = "ReadOnly";
+            pArgs[1].Value <<= false;
+            pArgs[2].Name = "Silent";
+            pArgs[2].Value <<= false; // Allow error dialogs for debugging
+            
+            // For text files, we might want to specify additional parameters
+            OUString sFileName = aTempFile.GetFileName();
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Loading file: " << sFileName);
+            
+            if (sFileName.endsWithIgnoreAsciiCase(".txt") || sFileName.endsWithIgnoreAsciiCase(".text"))
+            {
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Detected text file, adding special loading parameters");
+                // Expand args for text files
+                aArgs.realloc(5);
+                pArgs = aArgs.getArray(); // Get new array pointer after realloc
+                pArgs[3].Name = "FilterName";
+                pArgs[3].Value <<= OUString("Text");
+                pArgs[4].Name = "DocumentService";
+                pArgs[4].Value <<= OUString("com.sun.star.text.TextDocument");
+            }
+            
+            std::cerr << "*** CLOUD DEBUG: About to call loadComponentFromURL with " << aArgs.getLength() << " arguments" << std::endl;
+            std::cerr << "*** CLOUD DEBUG: URL to load: " << sTempFileURL << std::endl;
+            std::cerr << "*** CLOUD DEBUG: Target frame: _default" << std::endl;
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: About to call loadComponentFromURL with " << aArgs.getLength() << " arguments");
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: URL to load: " << sTempFileURL);
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Target frame: _default");
+            
+            css::uno::Reference<css::lang::XComponent> xComponent;
+            try {
+                std::cerr << "*** CLOUD DEBUG: Calling loadComponentFromURL now..." << std::endl;
+                xComponent = xDesktop->loadComponentFromURL(sTempFileURL, "_default", 0, aArgs);
+                std::cerr << "*** CLOUD DEBUG: loadComponentFromURL completed successfully" << std::endl;
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: loadComponentFromURL completed successfully");
+            } catch (const css::uno::Exception& loadEx) {
+                std::cerr << "*** CLOUD DEBUG: Exception during loadComponentFromURL: " << loadEx.Message << std::endl;
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Exception during loadComponentFromURL: " << loadEx.Message);
+                throw;
+            }
+            
+            if (xComponent.is())
+            {
+                std::cerr << "*** CLOUD DEBUG: Component loaded successfully" << std::endl;
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Component loaded successfully");
+                
+                // Try to query for different interfaces to see what's available
+                css::uno::Reference<css::frame::XModel> xModel(xComponent, css::uno::UNO_QUERY);
+                if (xModel.is()) {
+                    std::cerr << "*** CLOUD DEBUG: XModel interface is available" << std::endl;
+                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: XModel interface is available");
+                } else {
+                    std::cerr << "*** CLOUD DEBUG: WARNING - XModel interface is NOT available" << std::endl;
+                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: WARNING - XModel interface is NOT available");
+                }
+                
+                css::uno::Reference<css::frame::XModel2> xModel2(xComponent, css::uno::UNO_QUERY);
+                if (xModel2.is()) {
+                    std::cerr << "*** CLOUD DEBUG: XModel2 interface is available" << std::endl;
+                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: XModel2 interface is available");
+                } else {
+                    std::cerr << "*** CLOUD DEBUG: WARNING - XModel2 interface is NOT available" << std::endl;
+                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: WARNING - XModel2 interface is NOT available");
+                }
+                
+                css::uno::Reference<css::frame::XModel3> xModel3(xComponent, css::uno::UNO_QUERY);
+                if (xModel3.is()) {
+                    std::cerr << "*** CLOUD DEBUG: XModel3 interface is available" << std::endl;
+                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: XModel3 interface is available");
+                } else {
+                    std::cerr << "*** CLOUD DEBUG: WARNING - XModel3 interface is NOT available" << std::endl;
+                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: WARNING - XModel3 interface is NOT available");
+                }
+                
+                std::cerr << "*** CLOUD DEBUG: Cloud document opened successfully: " << sCloudUrl << std::endl;
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Cloud document opened successfully: " << sCloudUrl);
+            }
+            else
+            {
+                std::cerr << "*** CLOUD DEBUG: ERROR - loadComponentFromURL returned null component" << std::endl;
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: ERROR - loadComponentFromURL returned null component");
+                throw css::uno::RuntimeException("Failed to open downloaded cloud document - no component returned");
+            }
+        }
+        catch (const css::uno::RuntimeException& e)
+        {
+            // Handle interface-related runtime exceptions more gracefully
+            std::cerr << "*** CLOUD DEBUG: RuntimeException during document loading: " << e.Message << std::endl;
+            std::cerr << "*** CLOUD DEBUG: Exception type: RuntimeException" << std::endl;
+            std::cerr << "*** CLOUD DEBUG: Full error message: " << e.Message << std::endl;
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: RuntimeException during document loading: " << e.Message);
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Exception type: RuntimeException");
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Full error message: " << e.Message);
+            
+            // Try to provide a more user-friendly message for interface issues
+            OUString sError = e.Message;
+            if (sError.indexOf("XModel3") != -1 || sError.indexOf("interface") != -1)
+            {
+                std::cerr << "*** CLOUD DEBUG: This appears to be an XModel3 interface error!" << std::endl;
+                std::cerr << "*** CLOUD DEBUG: This may be due to document type incompatibility" << std::endl;
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: This appears to be an XModel3 interface error!");
+                SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: This may be due to document type incompatibility");
+                throw css::uno::RuntimeException("This document type may not be fully supported for cloud opening. Please try downloading the file manually.");
+            }
+            else
+            {
+                throw css::uno::RuntimeException("Failed to open cloud document: " + sError);
+            }
+        }
+        catch (const css::uno::Exception& e)
+        {
+            // Catch all other UNO exceptions
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: UNO Exception during document loading: " << e.Message);
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Exception type: UNO Exception");
+            throw css::uno::RuntimeException("Failed to open cloud document: " + e.Message);
+        }
+        catch (const std::exception& e)
+        {
+            // Catch standard C++ exceptions
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: std::exception during document loading: " << e.what());
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Exception type: std::exception");
+            throw css::uno::RuntimeException("Failed to open cloud document. Please check your connection and try again.");
+        }
+        catch (...)
+        {
+            // Catch any other exceptions
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Unknown exception during document loading");
+            SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Exception type: Unknown");
+            throw css::uno::RuntimeException("An unexpected error occurred while opening the cloud document.");
+        }
+    }
+    catch (const css::uno::Exception& e)
+    {
+        SAL_WARN("sfx.dialog", "Exception in handleCloudDocumentOpening: " << e.Message);
+        std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+            VclMessageType::Error, VclButtonsType::Ok,
+            "Failed to open cloud document: " + e.Message));
+        xBox->set_title("LibreCloud Error");
+        xBox->run();
+    }
+    catch (const std::exception& e)
+    {
+        SAL_WARN("sfx.dialog", "std::exception in handleCloudDocumentOpening: " << e.what());
+        std::unique_ptr<weld::MessageDialog> xBox(Application::CreateMessageDialog(GetFrameWeld(),
+            VclMessageType::Error, VclButtonsType::Ok,
+            "Failed to open cloud document. Please check your connection and try again."));
         xBox->set_title("LibreCloud Error");
         xBox->run();
     }

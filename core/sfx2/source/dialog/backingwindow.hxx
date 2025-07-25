@@ -117,6 +117,12 @@ private:
     void applyFilter();
     void openCloudFilesDialog();
 
+    /**
+     * Handle opening of cloud documents from cloud:// URLs
+     * @param sCloudUrl URL in format "cloud://document-id"
+     */
+    void handleCloudDocumentOpening(const OUString& sCloudUrl);
+
 public:
     explicit BackingWindow(vcl::Window* pParent);
     virtual ~BackingWindow() override;

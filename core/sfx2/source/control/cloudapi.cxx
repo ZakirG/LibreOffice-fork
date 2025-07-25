@@ -17,6 +17,7 @@
 #include <comphelper/string.hxx>
 #include <iostream>
 #include <cstdio>
+#include <cstring>
 
 namespace
 {
@@ -340,6 +341,194 @@ bool CloudApiClient::deleteDocument(const OUString& sDocId)
     return nResponseCode == 200;
 }
 
+bool CloudApiClient::requestPresignedUrlForDocument(const OUString& sDocId, const OUString& sMode, OUString& rsPresignedUrl)
+{
+    if (!m_pCurl || m_sJwtToken.isEmpty() || sDocId.isEmpty())
+    {
+        SAL_WARN("sfx.control", "CloudApiClient::requestPresignedUrlForDocument - Invalid parameters");
+        return false;
+    }
+
+    OUString sUrl = m_sBaseUrl + "/api/presign";
+    
+    // Create JSON request body with mode and docId
+    OUString sRequestBody = "{\"mode\":\"" + sMode + "\",\"docId\":\"" + sDocId + "\"}";
+    OUString sResponse;
+    long nResponseCode = 0;
+
+    SAL_WARN("sfx.control", "Requesting presigned URL for document: " << sDocId << " mode: " << sMode);
+
+    if (!httpPost(sUrl, sRequestBody, sResponse, &nResponseCode))
+    {
+        SAL_WARN("sfx.control", "Failed to request presigned URL for document");
+        return false;
+    }
+
+    if (nResponseCode != 200)
+    {
+        SAL_WARN("sfx.control", "Presigned URL request failed with code: " << nResponseCode);
+        return false;
+    }
+
+    // Extract presigned URL from response
+    rsPresignedUrl = extractJsonValue(sResponse, "presignedUrl");
+    
+    return !rsPresignedUrl.isEmpty();
+}
+
+bool CloudApiClient::downloadDocument(const OUString& sPresignedUrl, std::vector<char>& rDocumentData)
+{
+    std::cerr << "*** CLOUD DEBUG: downloadDocument() function entry" << std::endl;
+    
+    if (!m_pCurl || sPresignedUrl.isEmpty())
+    {
+        std::cerr << "*** CLOUD DEBUG: ERROR - Invalid parameters in downloadDocument()" << std::endl;
+        std::cerr << "*** CLOUD DEBUG: m_pCurl is null: " << (m_pCurl == nullptr) << std::endl;
+        std::cerr << "*** CLOUD DEBUG: sPresignedUrl is empty: " << sPresignedUrl.isEmpty() << std::endl;
+        SAL_WARN("sfx.control", "CloudApiClient::downloadDocument - Invalid parameters");
+        return false;
+    }
+
+    std::cerr << "*** CLOUD DEBUG: downloadDocument() called" << std::endl;
+    std::cerr << "*** CLOUD DEBUG: Presigned URL: " << sPresignedUrl << std::endl;
+    std::cerr << "*** CLOUD DEBUG: Parameters validated successfully" << std::endl;
+    SAL_WARN("sfx.control", "*** CLOUD DEBUG: Downloading document from presigned URL");
+    SAL_WARN("sfx.control", "*** CLOUD DEBUG: Presigned URL: " << sPresignedUrl);
+
+    // Simple structure to hold document data
+    struct DocumentDownload
+    {
+        std::vector<char> data;
+    };
+
+    DocumentDownload download;
+    OString sUrlUtf8 = OUStringToOString(sPresignedUrl, RTL_TEXTENCODING_UTF8);
+    std::cerr << "*** CLOUD DEBUG: URL converted to UTF8: " << sUrlUtf8.getStr() << std::endl;
+    SAL_WARN("sfx.control", "*** CLOUD DEBUG: URL converted to UTF8: " << sUrlUtf8.getStr());
+
+    std::cerr << "*** CLOUD DEBUG: About to reset curl options" << std::endl;
+    // Reset curl state for clean GET request
+    curl_easy_setopt(m_pCurl, CURLOPT_POST, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_UPLOAD, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_NOBODY, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_CUSTOMREQUEST, NULL);
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDS, NULL);
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDSIZE, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, NULL);
+    std::cerr << "*** CLOUD DEBUG: Curl options reset completed" << std::endl;
+
+    // Set URL
+    std::cerr << "*** CLOUD DEBUG: About to set CURLOPT_URL" << std::endl;
+    curl_easy_setopt(m_pCurl, CURLOPT_URL, sUrlUtf8.getStr());
+    std::cerr << "*** CLOUD DEBUG: CURLOPT_URL set successfully" << std::endl;
+    
+    std::cerr << "*** CLOUD DEBUG: About to set CURLOPT_HTTPGET" << std::endl;
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPGET, 1L);
+    std::cerr << "*** CLOUD DEBUG: CURLOPT_HTTPGET set successfully" << std::endl;
+
+    // Set write callback for binary data - use plain C function to avoid lambda issues
+    std::cerr << "*** CLOUD DEBUG: About to set up write callback" << std::endl;
+
+    // Simple C-style callback function  
+    static auto simpleWriteCallback = +[](void* contents, size_t size, size_t nmemb, void* userp) -> size_t {
+        std::cerr << "*** CLOUD DEBUG: Write callback called with " << (size * nmemb) << " bytes" << std::endl;
+        size_t realsize = size * nmemb;
+        DocumentDownload* download = static_cast<DocumentDownload*>(userp);
+        
+        if (download) {
+            try {
+                size_t oldSize = download->data.size();
+                download->data.resize(oldSize + realsize);
+                std::memcpy(&download->data[oldSize], contents, realsize);
+                std::cerr << "*** CLOUD DEBUG: Write callback completed, total size now: " << download->data.size() << std::endl;
+            } catch (...) {
+                std::cerr << "*** CLOUD DEBUG: Exception in write callback!" << std::endl;
+                return 0; // Signal error to curl
+            }
+        } else {
+            std::cerr << "*** CLOUD DEBUG: ERROR - userp is null in write callback!" << std::endl;
+            return 0; // Signal error to curl
+        }
+        
+        return realsize;
+    };
+
+    std::cerr << "*** CLOUD DEBUG: About to set CURLOPT_WRITEFUNCTION" << std::endl;
+    curl_easy_setopt(m_pCurl, CURLOPT_WRITEFUNCTION, simpleWriteCallback);
+    std::cerr << "*** CLOUD DEBUG: About to set CURLOPT_WRITEDATA" << std::endl;
+    curl_easy_setopt(m_pCurl, CURLOPT_WRITEDATA, &download);
+    std::cerr << "*** CLOUD DEBUG: Write callback setup completed" << std::endl;
+
+    // Perform request
+    std::cerr << "*** CLOUD DEBUG: About to call curl_easy_perform()" << std::endl;
+    SAL_WARN("sfx.control", "*** CLOUD DEBUG: Starting HTTP GET request");
+    
+    CURLcode res;
+    try {
+        std::cerr << "*** CLOUD DEBUG: Calling curl_easy_perform() now..." << std::endl;
+        res = curl_easy_perform(m_pCurl);
+        std::cerr << "*** CLOUD DEBUG: curl_easy_perform() completed with code: " << res << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "*** CLOUD DEBUG: std::exception caught during curl_easy_perform(): " << e.what() << std::endl;
+        return false;
+    } catch (...) {
+        std::cerr << "*** CLOUD DEBUG: Unknown exception caught during curl_easy_perform()!" << std::endl;
+        return false;
+    }
+    
+    SAL_WARN("sfx.control", "*** CLOUD DEBUG: HTTP GET request completed with CURLcode: " << res);
+
+    if (res == CURLE_OK)
+    {
+        long nResponseCode = 0;
+        curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, &nResponseCode);
+        m_nLastResponseCode = nResponseCode;
+        SAL_WARN("sfx.control", "*** CLOUD DEBUG: HTTP response code: " << nResponseCode);
+        SAL_WARN("sfx.control", "*** CLOUD DEBUG: Downloaded data size: " << download.data.size() << " bytes");
+
+        if (nResponseCode == 200)
+        {
+            rDocumentData = std::move(download.data);
+            std::cerr << "*** CLOUD DEBUG: Document download successful!" << std::endl;
+            std::cerr << "*** CLOUD DEBUG: Final document data size: " << rDocumentData.size() << " bytes" << std::endl;
+            SAL_WARN("sfx.control", "*** CLOUD DEBUG: Document download successful!");
+            SAL_WARN("sfx.control", "*** CLOUD DEBUG: Final document data size: " << rDocumentData.size() << " bytes");
+            
+            // Show first few bytes for debugging (if text content)
+            if (rDocumentData.size() > 0) {
+                std::string preview;
+                size_t previewSize = std::min(static_cast<size_t>(100), rDocumentData.size());
+                for (size_t i = 0; i < previewSize; ++i) {
+                    char c = rDocumentData[i];
+                    if (c >= 32 && c <= 126) { // Printable ASCII
+                        preview += c;
+                    } else {
+                        preview += "?";
+                    }
+                }
+                            std::cerr << "*** CLOUD DEBUG: Content preview (first " << previewSize << " bytes): " << preview << std::endl;
+            SAL_WARN("sfx.control", "*** CLOUD DEBUG: Content preview (first " << previewSize << " bytes): " << preview.c_str());
+            }
+            
+            std::cerr << "*** CLOUD DEBUG: downloadDocument() returning TRUE (success)" << std::endl;
+            return true;
+        }
+        else
+        {
+            std::cerr << "*** CLOUD DEBUG: downloadDocument() returning FALSE - HTTP error: " << nResponseCode << std::endl;
+            SAL_WARN("sfx.control", "*** CLOUD DEBUG: Document download failed with HTTP code: " << nResponseCode);
+            return false;
+        }
+    }
+    else
+    {
+        m_nLastResponseCode = 0;
+        std::cerr << "*** CLOUD DEBUG: downloadDocument() returning FALSE - CURL error: " << curl_easy_strerror(res) << std::endl;
+        SAL_WARN("sfx.control", "*** CLOUD DEBUG: Document download failed with curl error: " << curl_easy_strerror(res));
+        return false;
+    }
+}
+
 // Private helper methods
 
 bool CloudApiClient::httpGet(const OUString& sUrl, OUString& rsResponse, long* pnResponseCode)
@@ -575,6 +764,8 @@ bool CloudApiClient::httpDelete(const OUString& sUrl, OUString& rsResponse, long
 bool CloudApiClient::uploadFile(const OUString& sUrl, const char* pData, size_t nDataSize, 
                                const OUString& sContentType, OUString& rsResponse, long* pnResponseCode)
 {
+    (void)sContentType; // Suppress unused parameter warning
+    
     if (!m_pCurl || !pData || nDataSize == 0)
         return false;
 
