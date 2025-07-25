@@ -117,24 +117,39 @@ void ViewContactOfSdrMediaObj::createViewIndependentPrimitive2DSequence(drawingl
     const OUString& rURL(GetSdrMediaObj().getURL());
     const sal_uInt32 nPixelBorder(4);
     
-    // Check if this is an audio file and skip the icon (6:1 aspect ratio rectangles)
-    auto isAudioFile = [](const OUString& rURL) -> bool {
-        if (rURL.isEmpty())
+    // Extract filename from URL
+    OUString sFilename;
+    if (!rURL.isEmpty())
+    {
+        sal_Int32 nLastSlash = std::max(rURL.lastIndexOf('/'), rURL.lastIndexOf('\\'));
+        if (nLastSlash != -1 && nLastSlash < rURL.getLength() - 1)
+        {
+            sFilename = rURL.copy(nLastSlash + 1);
+        }
+        else
+        {
+            sFilename = rURL; // fallback if no path separator found
+        }
+    }
+    
+    // Check if this is an audio file and skip the icon
+    auto isAudioFile = [](const OUString& rFilename) -> bool {
+        if (rFilename.isEmpty())
             return false;
-        sal_Int32 nLastDot = rURL.lastIndexOf('.');
-        if (nLastDot == -1 || nLastDot == rURL.getLength() - 1)
+        sal_Int32 nLastDot = rFilename.lastIndexOf('.');
+        if (nLastDot == -1 || nLastDot == rFilename.getLength() - 1)
             return false;
-        OUString sExtension = rURL.copy(nLastDot + 1).toAsciiLowerCase();
+        OUString sExtension = rFilename.copy(nLastDot + 1).toAsciiLowerCase();
         return sExtension == "mp3" || sExtension == "wav" || sExtension == "m4a";
     };
     
     // For audio files, use empty graphic to remove the music icon
-    const Graphic aSnapshot = isAudioFile(rURL) ? Graphic() : GetSdrMediaObj().getSnapshot();
+    const Graphic aSnapshot = isAudioFile(sFilename) ? Graphic() : GetSdrMediaObj().getSnapshot();
     
     const drawinglayer::primitive2d::Primitive2DReference xRetval(
         new drawinglayer::primitive2d::MediaPrimitive2D(
             aTransform, rURL, aBackgroundColor, nPixelBorder,
-            aSnapshot));
+            aSnapshot, sFilename));
 
     rVisitor.visit(xRetval);
 }

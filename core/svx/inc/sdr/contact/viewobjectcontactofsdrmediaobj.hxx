@@ -31,7 +31,7 @@ namespace vcl { class Window; }
 
 namespace sdr::contact
     {
-        class SdrMediaWindow;
+        class SdrMediaWindowInterface;
 
         class ViewObjectContactOfSdrMediaObj final : public ViewObjectContactOfSdrObj
         {
@@ -57,7 +57,7 @@ namespace sdr::contact
             void updateMediaWindow(bool bShow) const;
 
 #if HAVE_FEATURE_AVMEDIA
-            std::unique_ptr<sdr::contact::SdrMediaWindow> mpMediaWindow;
+            std::unique_ptr<sdr::contact::SdrMediaWindowInterface> mpMediaWindow;
 #endif
         };
 

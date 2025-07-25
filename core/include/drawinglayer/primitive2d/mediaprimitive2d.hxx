@@ -47,6 +47,9 @@ namespace drawinglayer::primitive2d
             /// the content definition
             OUString                               maURL;
 
+            /// the filename extracted from URL for audio files
+            OUString                               maFilename;
+
             /// style: background color
             basegfx::BColor                             maBackgroundColor;
 
@@ -65,10 +68,13 @@ namespace drawinglayer::primitive2d
                 OUString aURL,
                 const basegfx::BColor& rBackgroundColor,
                 sal_uInt32 nDiscreteBorder,
-                Graphic aSnapshot);
+                Graphic aSnapshot,
+                const OUString& rFilename = OUString());
 
             /// data read access
             const basegfx::B2DHomMatrix& getTransform() const { return maTransform; }
+            const OUString& getURL() const { return maURL; }
+            const OUString& getFilename() const { return maFilename; }
             const basegfx::BColor& getBackgroundColor() const { return maBackgroundColor; }
             sal_uInt32 getDiscreteBorder() const { return mnDiscreteBorder; }
 

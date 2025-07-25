@@ -46,7 +46,25 @@ namespace drawinglayer::primitive2d
                     getBackgroundColor()));
             xRetval[0] = xRefBackground;
 
-            if(GraphicType::Bitmap == maSnapshot.GetType() || GraphicType::GdiMetafile == maSnapshot.GetType())
+            // Check if this is an audio file
+            auto isAudioFile = [](const OUString& rFilename) -> bool {
+                if (rFilename.isEmpty())
+                    return false;
+                sal_Int32 nLastDot = rFilename.lastIndexOf('.');
+                if (nLastDot == -1 || nLastDot == rFilename.getLength() - 1)
+                    return false;
+                OUString sExtension = rFilename.copy(nLastDot + 1).toAsciiLowerCase();
+                return sExtension == "mp3" || sExtension == "wav" || sExtension == "m4a";
+            };
+
+            if (!maFilename.isEmpty() && isAudioFile(maFilename))
+            {
+                // For audio files, we'll create a special primitive that will eventually
+                // render using AudioPlayerControl. For now, we'll use the background only
+                // since the actual AudioPlayerControl integration happens at a higher level.
+                // The key is that we don't add a GraphicPrimitive2D here for audio files.
+            }
+            else if(GraphicType::Bitmap == maSnapshot.GetType() || GraphicType::GdiMetafile == maSnapshot.GetType())
             {
                 const GraphicObject aGraphicObject(maSnapshot);
                 const GraphicAttr aGraphicAttr;
@@ -97,9 +115,11 @@ namespace drawinglayer::primitive2d
             OUString aURL,
             const basegfx::BColor& rBackgroundColor,
             sal_uInt32 nDiscreteBorder,
-            Graphic aSnapshot)
+            Graphic aSnapshot,
+            const OUString& rFilename)
         :   maTransform(std::move(aTransform)),
             maURL(std::move(aURL)),
+            maFilename(rFilename),
             maBackgroundColor(rBackgroundColor),
             mnDiscreteBorder(nDiscreteBorder),
             maSnapshot(std::move(aSnapshot))
@@ -114,6 +134,7 @@ namespace drawinglayer::primitive2d
 
                 return (getTransform() == rCompare.getTransform()
                     && maURL == rCompare.maURL
+                    && maFilename == rCompare.maFilename
                     && getBackgroundColor() == rCompare.getBackgroundColor()
                     && getDiscreteBorder() == rCompare.getDiscreteBorder()
                     && maSnapshot.IsNone() == rCompare.maSnapshot.IsNone());

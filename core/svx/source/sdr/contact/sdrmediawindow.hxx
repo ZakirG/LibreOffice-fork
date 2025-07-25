@@ -21,13 +21,14 @@
 #define INCLUDED_SVX_SOURCE_SDR_CONTACT_SDRMEDIAWINDOW_HXX
 
 #include <avmedia/mediawindow.hxx>
+#include "sdrmediawindowinterface.hxx"
 
 namespace sdr::contact {
 
 
 class ViewObjectContactOfSdrMediaObj;
 
-class SdrMediaWindow : public ::avmedia::MediaWindow
+class SdrMediaWindow : public ::avmedia::MediaWindow, public SdrMediaWindowInterface
 {
 public:
 
@@ -47,6 +48,15 @@ public:
         virtual sal_Int8    ExecuteDrop( const ExecuteDropEvent& rEvt ) override;
 
         virtual void        StartDrag( sal_Int8 nAction, const Point& rPosPixel ) override;
+
+        // SdrMediaWindowInterface implementation
+        virtual Size getPreferredSize() const override;
+        virtual void updateMediaItem(::avmedia::MediaItem& rItem) const override;
+        virtual void executeMediaItem(const ::avmedia::MediaItem& rItem) override;
+        virtual void setPosSize(const tools::Rectangle& rRect) override;
+        virtual void show() override;
+        virtual void hide() override;
+        virtual bool isVisible() const override;
 
 private:
 

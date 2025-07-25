@@ -169,6 +169,42 @@ void SdrMediaWindow::StartDrag( sal_Int8 nAction, const Point& rPosPixel )
     }
 }
 
+// SdrMediaWindowInterface implementation
+Size SdrMediaWindow::getPreferredSize() const
+{
+    return ::avmedia::MediaWindow::getPreferredSize();
+}
+
+void SdrMediaWindow::updateMediaItem(::avmedia::MediaItem& rItem) const
+{
+    ::avmedia::MediaWindow::updateMediaItem(rItem);
+}
+
+void SdrMediaWindow::executeMediaItem(const ::avmedia::MediaItem& rItem)
+{
+    ::avmedia::MediaWindow::executeMediaItem(rItem);
+}
+
+void SdrMediaWindow::setPosSize(const tools::Rectangle& rRect)
+{
+    ::avmedia::MediaWindow::setPosSize(rRect);
+}
+
+void SdrMediaWindow::show()
+{
+    ::avmedia::MediaWindow::show();
+}
+
+void SdrMediaWindow::hide()
+{
+    ::avmedia::MediaWindow::hide();
+}
+
+bool SdrMediaWindow::isVisible() const
+{
+    return ::avmedia::MediaWindow::isVisible();
+}
+
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

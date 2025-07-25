@@ -7,7 +7,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <audioplayer.hxx>
+#include <vcl/audioplayer.hxx>
 #include <vcl/event.hxx>
 #include <vcl/outdev.hxx>
 #include <vcl/settings.hxx>
@@ -82,23 +82,37 @@ void AudioPlayerControl::SetFilename(const OUString& rFilename)
 
 void AudioPlayerControl::Play()
 {
-    // Placeholder implementation - will be enhanced in later steps
     if (m_xPlayer.is() && !m_bIsPlaying)
     {
-        SAL_INFO("vcl", "AudioPlayerControl::Play() - Starting playback");
-        m_bIsPlaying = true;
-        Invalidate();
+        try
+        {
+            SAL_INFO("vcl", "AudioPlayerControl::Play() - Starting playback");
+            m_xPlayer->start();
+            m_bIsPlaying = true;
+            Invalidate(); // Update visual state to show pause button
+        }
+        catch (const css::uno::Exception& e)
+        {
+            SAL_WARN("vcl", "AudioPlayerControl::Play() - Failed to start playback: " << e.Message);
+        }
     }
 }
 
 void AudioPlayerControl::Stop()
 {
-    // Placeholder implementation - will be enhanced in later steps
-    if (m_bIsPlaying)
+    if (m_xPlayer.is() && m_bIsPlaying)
     {
-        SAL_INFO("vcl", "AudioPlayerControl::Stop() - Stopping playback");
-        m_bIsPlaying = false;
-        Invalidate();
+        try
+        {
+            SAL_INFO("vcl", "AudioPlayerControl::Stop() - Stopping playback");
+            m_xPlayer->stop();
+            m_bIsPlaying = false;
+            Invalidate(); // Update visual state to show play button
+        }
+        catch (const css::uno::Exception& e)
+        {
+            SAL_WARN("vcl", "AudioPlayerControl::Stop() - Failed to stop playback: " << e.Message);
+        }
     }
 }
 
@@ -108,6 +122,11 @@ void AudioPlayerControl::TogglePlayStop()
         Stop();
     else
         Play();
+}
+
+void AudioPlayerControl::HandleMouseClick(const MouseEvent& rMEvt)
+{
+    MouseButtonDown(rMEvt);
 }
 
 void AudioPlayerControl::Paint(vcl::RenderContext& rRenderContext, const tools::Rectangle& /*rRect*/)

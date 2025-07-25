@@ -261,6 +261,7 @@ $(eval $(call gb_Library_add_exception_objects,svxcore,\
     svx/source/sdr/contact/viewobjectcontactofunocontrol \
     svx/source/sdr/contact/viewobjectcontactofgraphic \
     $(call gb_Helper_optional,AVMEDIA,svx/source/sdr/contact/sdrmediawindow) \
+$(call gb_Helper_optional,AVMEDIA,svx/source/sdr/contact/sdraudioplayerwindow) \
     svx/source/sdr/contact/viewobjectcontactofsdrmediaobj \
     svx/source/sdr/contact/viewcontactofsdrcaptionobj \
     svx/source/sdr/contact/viewcontactofvirtobj \

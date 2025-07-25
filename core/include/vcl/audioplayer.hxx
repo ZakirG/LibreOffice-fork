@@ -44,12 +44,17 @@ public:
     void Stop();
     void TogglePlayStop();
     
+    // Make GetOptimalSize public for SdrAudioPlayerWindow
+    Size GetOptimalSize() const override;
+    
+    // Public method to handle mouse clicks from parent windows
+    void HandleMouseClick(const MouseEvent& rMEvt);
+    
 protected:
     // Override virtual methods from Control/Window
     virtual void Paint(vcl::RenderContext& rRenderContext, const tools::Rectangle& rRect) override;
     virtual void MouseButtonDown(const MouseEvent& rMEvt) override;
     virtual void Resize() override;
-    virtual Size GetOptimalSize() const override;
     
 private:
     void DrawControl(vcl::RenderContext& rRenderContext);

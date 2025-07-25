@@ -26,6 +26,7 @@
 #include <vcl/window.hxx>
 #include <avmedia/mediaitem.hxx>
 #include "sdrmediawindow.hxx"
+#include "sdraudioplayerwindow.hxx"
 
 namespace sdr::contact {
 
@@ -39,7 +40,34 @@ ViewObjectContactOfSdrMediaObj::ViewObjectContactOfSdrMediaObj( ObjectContact& r
 
     if( pWindow )
     {
-        mpMediaWindow.reset( new SdrMediaWindow( pWindow, *this ) );
+        // Check if this is an audio file
+        const OUString& rURL = rMediaItem.getURL();
+        auto isAudioFile = [](const OUString& rURL) -> bool {
+            if (rURL.isEmpty())
+                return false;
+            sal_Int32 nLastDot = rURL.lastIndexOf('.');
+            if (nLastDot == -1 || nLastDot == rURL.getLength() - 1)
+                return false;
+            OUString sExtension = rURL.copy(nLastDot + 1).toAsciiLowerCase();
+            return sExtension == "mp3" || sExtension == "wav" || sExtension == "m4a";
+        };
+
+        bool bIsAudio = isAudioFile(rURL);
+        SAL_INFO("vcl", "ViewObjectContactOfSdrMediaObj: URL=" << rURL << " isAudio=" << bIsAudio);
+
+        if (bIsAudio)
+        {
+            // Create audio player window for audio files
+            SAL_INFO("vcl", "Creating SdrAudioPlayerWindow for audio file");
+            mpMediaWindow.reset( new SdrAudioPlayerWindow( pWindow, *this ) );
+        }
+        else
+        {
+            // Create standard media window for video/other media
+            SAL_INFO("vcl", "Creating standard SdrMediaWindow for non-audio file");
+            mpMediaWindow.reset( new SdrMediaWindow( pWindow, *this ) );
+        }
+        
         mpMediaWindow->hide();
         executeMediaItem( rMediaItem );
     }
@@ -137,12 +165,19 @@ void ViewObjectContactOfSdrMediaObj::updateMediaItem( ::avmedia::MediaItem& rIte
     mpMediaWindow->updateMediaItem( rItem );
 
     // show/hide is now dependent of play state
-    if(avmedia::MediaState::Stop == rItem.getState())
+    // For audio files, always show the control so users can see the play button
+    bool isAudioPlayer = dynamic_cast<SdrAudioPlayerWindow*>(mpMediaWindow.get()) != nullptr;
+    
+    SAL_INFO("vcl", "updateMediaItem: state=" << static_cast<int>(rItem.getState()) << " isAudioPlayer=" << isAudioPlayer);
+    
+    if(avmedia::MediaState::Stop == rItem.getState() && !isAudioPlayer)
     {
+        SAL_INFO("vcl", "Hiding media window (video in stop state)");
         mpMediaWindow->hide();
     }
     else
     {
+        SAL_INFO("vcl", "Showing media window");
         updateMediaWindow(true);
     }
 #else
