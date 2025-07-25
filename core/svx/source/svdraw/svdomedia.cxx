@@ -74,6 +74,7 @@ SdrMediaObj::SdrMediaObj(SdrModel& rSdrModel)
 :   SdrRectObj(rSdrModel)
     ,m_xImpl( new Impl )
 {
+    SAL_WARN("vcl.audio", "=== SdrMediaObj CONSTRUCTOR (1 param) ===");
 }
 
 SdrMediaObj::SdrMediaObj(SdrModel& rSdrModel, SdrMediaObj const & rSource)
@@ -93,6 +94,9 @@ SdrMediaObj::SdrMediaObj(
 :   SdrRectObj(rSdrModel, rRect)
     ,m_xImpl( new Impl )
 {
+    SAL_WARN("vcl.audio", "=== SdrMediaObj CONSTRUCTOR (2 params) with rect ===");
+    fprintf(stderr, "*** DIRECT LOG: SdrMediaObj created with rectangle ***\n");
+    
     osl_atomic_increment(&m_refCount);
 
     const bool bUndo(rSdrModel.IsUndoEnabled());
@@ -114,6 +118,7 @@ bool SdrMediaObj::HasTextEdit() const
 
 std::unique_ptr<sdr::contact::ViewContact> SdrMediaObj::CreateObjectSpecificViewContact()
 {
+    SAL_WARN("vcl.audio", "=== SdrMediaObj::CreateObjectSpecificViewContact ===");
     return std::make_unique<sdr::contact::ViewContactOfSdrMediaObj>( *this );
 }
 
@@ -264,6 +269,8 @@ void SdrMediaObj::AdjustToMaxRect( const tools::Rectangle& rMaxRect, bool bShrin
 
 void SdrMediaObj::setURL(const OUString& rURL, const OUString& rReferer)
 {
+    SAL_WARN("vcl.audio", "=== SdrMediaObj::setURL called with URL: " << rURL);
+    
     ::avmedia::MediaItem aURLItem;
 #if HAVE_FEATURE_AVMEDIA
     aURLItem.setURL( rURL, u""_ustr, rReferer );

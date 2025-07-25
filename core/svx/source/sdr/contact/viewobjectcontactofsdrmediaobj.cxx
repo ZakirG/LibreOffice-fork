@@ -35,13 +35,18 @@ ViewObjectContactOfSdrMediaObj::ViewObjectContactOfSdrMediaObj( ObjectContact& r
                                                                 const ::avmedia::MediaItem& rMediaItem ) :
     ViewObjectContactOfSdrObj( rObjectContact, rViewContact )
 {
+    SAL_WARN("vcl.audio", "=== ViewObjectContactOfSdrMediaObj CONSTRUCTOR CALLED ===");
+    
 #if HAVE_FEATURE_AVMEDIA
     vcl::Window* pWindow = getWindow();
+    SAL_WARN("vcl.audio", "Window for media: " << pWindow);
 
     if( pWindow )
     {
         // Check if this is an audio file
         const OUString& rURL = rMediaItem.getURL();
+        SAL_WARN("vcl.audio", "Media URL: " << rURL);
+        
         auto isAudioFile = [](const OUString& rURL) -> bool {
             if (rURL.isEmpty())
                 return false;
@@ -49,24 +54,34 @@ ViewObjectContactOfSdrMediaObj::ViewObjectContactOfSdrMediaObj( ObjectContact& r
             if (nLastDot == -1 || nLastDot == rURL.getLength() - 1)
                 return false;
             OUString sExtension = rURL.copy(nLastDot + 1).toAsciiLowerCase();
-            return sExtension == "mp3" || sExtension == "wav" || sExtension == "m4a";
+            bool bIsAudio = sExtension == "mp3" || sExtension == "wav" || sExtension == "m4a";
+            SAL_WARN("vcl.audio", "Extension: '" << sExtension << "' isAudio: " << bIsAudio);
+            return bIsAudio;
         };
 
         if (isAudioFile(rURL))
         {
             // Create audio player window for audio files
+            SAL_WARN("vcl.audio", "CREATING AUDIO PLAYER WINDOW for URL: " << rURL);
             mpMediaWindow.reset( new SdrAudioPlayerWindow( pWindow, *this ) );
+            SAL_WARN("vcl.audio", "Audio player window created successfully: " << mpMediaWindow.get());
         }
         else
         {
             // Create standard media window for video/other media
+            SAL_WARN("vcl.audio", "Creating standard media window for non-audio URL: " << rURL);
             mpMediaWindow.reset( new SdrMediaWindow( pWindow, *this ) );
         }
         
         mpMediaWindow->hide();
         executeMediaItem( rMediaItem );
     }
+    else
+    {
+        SAL_WARN("vcl.audio", "NO WINDOW - cannot create media window");
+    }
 #else
+    SAL_WARN("vcl.audio", "AVMEDIA feature not available");
     (void) rMediaItem;
 #endif
 }
@@ -140,12 +155,17 @@ void ViewObjectContactOfSdrMediaObj::updateMediaWindow(bool bShow) const
     mpMediaWindow->setPosSize(aInitialRect);
 
     // then make it visible
+    fprintf(stderr, "*** DIRECT LOG: About to show media window ***\n");
     mpMediaWindow->show();
+    fprintf(stderr, "*** DIRECT LOG: Media window shown ***\n");
 
     // set the final desired size which is different to let vcl send it
     // through to gtk which will now accept it as the underlying
     // m_pSocket of GtkSalObject::SetPosSize is now visible
     mpMediaWindow->setPosSize(aViewRectangle);
+    fprintf(stderr, "*** DIRECT LOG: Media window sized to %d,%d %dx%d ***\n", 
+            aViewRectangle.Left(), aViewRectangle.Top(), 
+            aViewRectangle.GetWidth(), aViewRectangle.GetHeight());
 #else
     (void) bShow;
 #endif

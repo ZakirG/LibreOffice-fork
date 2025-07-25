@@ -3156,17 +3156,26 @@ bool SwTransferable::PasteFileName( const TransferableDataHelper& rData,
         if( rData.GetString( nFormat, sFile ) && !sFile.isEmpty() )
         {
 #if HAVE_FEATURE_AVMEDIA
+            SAL_WARN("vcl.audio", "=== DROPPED FILE in Writer: " << sFile);
+            fprintf(stderr, "*** DIRECT LOG: Processing dropped file in Writer ***\n");
             INetURLObject aMediaURL;
 
             aMediaURL.SetSmartURL( sFile );
             const OUString aMediaURLStr( aMediaURL.GetMainURL( INetURLObject::DecodeMechanism::NONE ) );
 
-            if( ::avmedia::MediaWindow::isMediaURL( aMediaURLStr, u""_ustr/*TODO?*/ ) )
+            SAL_WARN("vcl.audio", "Checking if file is media URL: " << aMediaURLStr);
+            bool bIsMediaURL = ::avmedia::MediaWindow::isMediaURL( aMediaURLStr, u""_ustr/*TODO?*/ );
+            SAL_WARN("vcl.audio", "isMediaURL result: " << bIsMediaURL);
+
+            if( bIsMediaURL )
             {
+                SAL_WARN("vcl.audio", "Dispatching SID_INSERT_AVMEDIA for: " << aMediaURLStr);
+                fprintf(stderr, "*** DIRECT LOG: Detected media file, dispatching insert command ***\n");
                 const SfxStringItem aMediaURLItem( SID_INSERT_AVMEDIA, aMediaURLStr );
                 rSh.GetView().GetViewFrame().GetDispatcher()->ExecuteList(
                                 SID_INSERT_AVMEDIA, SfxCallMode::SYNCHRON,
                                 { &aMediaURLItem });
+                fprintf(stderr, "*** DIRECT LOG: Insert command dispatched successfully ***\n");
             }
 #else
             if (false)

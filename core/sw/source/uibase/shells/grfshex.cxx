@@ -39,9 +39,11 @@ using namespace ::com::sun::star::uno;
 
 bool SwTextShell::InsertMediaDlg( SfxRequest const & rReq )
 {
+    SAL_WARN("vcl.audio", "=== SwTextShell::InsertMediaDlg CALLED ===");
     bool bRet = false;
 
 #if !HAVE_FEATURE_AVMEDIA
+    SAL_WARN("vcl.audio", "AVMEDIA feature not available in InsertMediaDlg");
     (void) rReq;
 #else
     OUString     aURL;

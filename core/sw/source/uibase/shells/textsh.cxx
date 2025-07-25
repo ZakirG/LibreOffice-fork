@@ -286,7 +286,10 @@ void SwTextShell::ExecInsert(SfxRequest &rReq)
 
 #if HAVE_FEATURE_AVMEDIA
     case SID_INSERT_AVMEDIA:
+        SAL_WARN("vcl.audio", "=== SID_INSERT_AVMEDIA command received in SwTextShell ===");
+        fprintf(stderr, "*** DIRECT LOG: SID_INSERT_AVMEDIA command executing ***\n");
         rReq.SetReturnValue(SfxBoolItem(nSlot, InsertMediaDlg( rReq )));
+        fprintf(stderr, "*** DIRECT LOG: SID_INSERT_AVMEDIA command completed ***\n");
         break;
 #endif
 

@@ -137,17 +137,82 @@ void AudioPlayerControl::Paint(vcl::RenderContext& rRenderContext, const tools::
 void AudioPlayerControl::MouseButtonDown(const MouseEvent& rMEvt)
 {
     // Log click event as per prompt requirement
-    SAL_INFO("vcl", "AudioPlayerControl::MouseButtonDown() - Control clicked at (" 
-             << rMEvt.GetPosPixel().X() << ", " << rMEvt.GetPosPixel().Y() << ")");
+    SAL_WARN("vcl.audio", "=== AudioPlayerControl::MouseButtonDown CALLED ===");
+    fprintf(stderr, "*** DIRECT LOG: Click on AudioPlayerControl at %d,%d ***\n", 
+            rMEvt.GetPosPixel().X(), rMEvt.GetPosPixel().Y());
+    SAL_WARN("vcl.audio", "Control clicked at: " << rMEvt.GetPosPixel().X() << ", " << rMEvt.GetPosPixel().Y());
     
     // Check if click is on play button area
     tools::Rectangle aPlayButtonRect = GetPlayButtonRect();
+    SAL_WARN("vcl.audio", "Play button rect: " << aPlayButtonRect.Left() << "," << aPlayButtonRect.Top() 
+             << " to " << aPlayButtonRect.Right() << "," << aPlayButtonRect.Bottom());
+    
     if (aPlayButtonRect.Contains(rMEvt.GetPosPixel()))
     {
+        SAL_WARN("vcl.audio", "PLAY BUTTON CLICKED - toggling playback");
+        fprintf(stderr, "*** DIRECT LOG: Play button clicked - handling locally ***\n");
         TogglePlayStop();
+        Control::MouseButtonDown(rMEvt);
+    }
+    else
+    {
+        SAL_WARN("vcl.audio", "CLICK OUTSIDE PLAY BUTTON - forwarding for dragging");
+        fprintf(stderr, "*** DIRECT LOG: Click outside play button - forwarding to parent ***\n");
+        
+        // Forward the event directly to parent window for dragging
+        vcl::Window* pParent = GetParent();
+        if (pParent)
+        {
+            fprintf(stderr, "*** DIRECT LOG: Forwarding mouse event to parent window ***\n");
+            pParent->MouseButtonDown(rMEvt);
+        }
+        else
+        {
+            fprintf(stderr, "*** DIRECT LOG: No parent window found! ***\n");
+            Control::MouseButtonDown(rMEvt);
+        }
     }
     
-    Control::MouseButtonDown(rMEvt);
+    SAL_WARN("vcl.audio", "AudioPlayerControl::MouseButtonDown complete");
+}
+
+void AudioPlayerControl::MouseButtonUp(const MouseEvent& rMEvt)
+{
+    fprintf(stderr, "*** DIRECT LOG: MouseButtonUp on AudioPlayerControl ***\n");
+    
+    // Always forward mouse up events to parent for proper drag completion
+    vcl::Window* pParent = GetParent();
+    if (pParent)
+    {
+        fprintf(stderr, "*** DIRECT LOG: Forwarding MouseButtonUp to parent ***\n");
+        pParent->MouseButtonUp(rMEvt);
+    }
+    else
+    {
+        Control::MouseButtonUp(rMEvt);
+    }
+}
+
+void AudioPlayerControl::MouseMove(const MouseEvent& rMEvt)
+{
+    static int moveCount = 0;
+    if (++moveCount % 20 == 1) { // Log every 20th move to avoid spam
+        fprintf(stderr, "*** DIRECT LOG: MouseMove #%d on AudioPlayerControl ***\n", moveCount);
+    }
+    
+    // Always forward mouse moves to parent for dragging
+    vcl::Window* pParent = GetParent();
+    if (pParent)
+    {
+        if (moveCount % 20 == 1) {
+            fprintf(stderr, "*** DIRECT LOG: Forwarding MouseMove to parent ***\n");
+        }
+        pParent->MouseMove(rMEvt);
+    }
+    else
+    {
+        Control::MouseMove(rMEvt);
+    }
 }
 
 void AudioPlayerControl::Resize()

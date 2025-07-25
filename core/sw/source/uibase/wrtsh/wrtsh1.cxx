@@ -2110,6 +2110,8 @@ SwWrtShell::SwWrtShell( SwDoc& rDoc, vcl::Window *_pWin, SwView &rShell,
     , m_rView(rShell)
     , m_aNavigationMgr(*this)
 {
+    SAL_WARN("vcl.audio", "=== SwWrtShell CONSTRUCTOR - Writer shell starting ===");
+    fprintf(stderr, "*** DIRECT LOG: SwWrtShell constructor called ***\n");
     BITFLD_INI_LIST
     CurrShell aCurr( this );
     SetSfxViewShell( static_cast<SfxViewShell *>(&rShell) );

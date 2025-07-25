@@ -29,6 +29,7 @@ namespace sdr::contact {
 ViewContactOfSdrMediaObj::ViewContactOfSdrMediaObj( SdrMediaObj& rMediaObj ) :
     ViewContactOfSdrObj( rMediaObj )
 {
+    SAL_WARN("vcl.audio", "=== ViewContactOfSdrMediaObj CONSTRUCTOR ===");
 }
 
 ViewContactOfSdrMediaObj::~ViewContactOfSdrMediaObj()

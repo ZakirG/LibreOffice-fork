@@ -201,6 +201,8 @@ void SwView::SelectShellForDrop()
 
 sal_Int8 SwEditWin::ExecuteDrop( const ExecuteDropEvent& rEvt )
 {
+    SAL_WARN("vcl.audio", "=== SwEditWin::ExecuteDrop CALLED ===");
+    fprintf(stderr, "*** DIRECT LOG: File dropped into Writer ***\n");
     GetView().SelectShellForDrop();
     DropCleanup();
     sal_Int8 nRet = DND_ACTION_NONE;
