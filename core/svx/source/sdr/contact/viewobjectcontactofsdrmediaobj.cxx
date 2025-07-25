@@ -52,19 +52,14 @@ ViewObjectContactOfSdrMediaObj::ViewObjectContactOfSdrMediaObj( ObjectContact& r
             return sExtension == "mp3" || sExtension == "wav" || sExtension == "m4a";
         };
 
-        bool bIsAudio = isAudioFile(rURL);
-        SAL_INFO("vcl", "ViewObjectContactOfSdrMediaObj: URL=" << rURL << " isAudio=" << bIsAudio);
-
-        if (bIsAudio)
+        if (isAudioFile(rURL))
         {
             // Create audio player window for audio files
-            SAL_INFO("vcl", "Creating SdrAudioPlayerWindow for audio file");
             mpMediaWindow.reset( new SdrAudioPlayerWindow( pWindow, *this ) );
         }
         else
         {
             // Create standard media window for video/other media
-            SAL_INFO("vcl", "Creating standard SdrMediaWindow for non-audio file");
             mpMediaWindow.reset( new SdrMediaWindow( pWindow, *this ) );
         }
         
@@ -168,16 +163,12 @@ void ViewObjectContactOfSdrMediaObj::updateMediaItem( ::avmedia::MediaItem& rIte
     // For audio files, always show the control so users can see the play button
     bool isAudioPlayer = dynamic_cast<SdrAudioPlayerWindow*>(mpMediaWindow.get()) != nullptr;
     
-    SAL_INFO("vcl", "updateMediaItem: state=" << static_cast<int>(rItem.getState()) << " isAudioPlayer=" << isAudioPlayer);
-    
     if(avmedia::MediaState::Stop == rItem.getState() && !isAudioPlayer)
     {
-        SAL_INFO("vcl", "Hiding media window (video in stop state)");
         mpMediaWindow->hide();
     }
     else
     {
-        SAL_INFO("vcl", "Showing media window");
         updateMediaWindow(true);
     }
 #else

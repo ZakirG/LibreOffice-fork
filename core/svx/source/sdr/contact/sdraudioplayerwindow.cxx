@@ -10,9 +10,11 @@
 #include "sdraudioplayerwindow.hxx"
 #include <sdr/contact/viewobjectcontactofsdrmediaobj.hxx>
 #include <vcl/event.hxx>
+#include <vcl/commandevent.hxx>
 #include <vcl/settings.hxx>
 #include <vcl/svapp.hxx>
 #include <tools/urlobj.hxx>
+#include <rtl/uri.hxx>
 
 namespace sdr::contact {
 
@@ -20,13 +22,9 @@ SdrAudioPlayerWindow::SdrAudioPlayerWindow(vcl::Window* pParent, ViewObjectConta
     : vcl::Window(pParent, WB_CLIPCHILDREN)
     , mrViewObjectContactOfSdrMediaObj(rViewObjContact)
 {
-    SAL_INFO("vcl", "SdrAudioPlayerWindow: Creating audio player window");
-    
     // Create the AudioPlayerControl as a child
     mpAudioPlayerControl = VclPtr<vcl::AudioPlayerControl>::Create(this);
     mpAudioPlayerControl->Show();
-    
-    SAL_INFO("vcl", "SdrAudioPlayerWindow: AudioPlayerControl created and shown");
     
     // Set background
     SetBackground(Wallpaper(Application::GetSettings().GetStyleSettings().GetFaceColor()));
@@ -71,6 +69,9 @@ void SdrAudioPlayerWindow::setURL(const OUString& rURL, const OUString& rReferer
                     sFilename = rURL;
                 }
             }
+            
+            // Decode URL-encoded filename (e.g., %20 -> space)
+            sFilename = rtl::Uri::decode(sFilename, rtl_UriDecodeWithCharset, RTL_TEXTENCODING_UTF8);
         }
         mpAudioPlayerControl->SetFilename(sFilename);
     }
@@ -177,13 +178,13 @@ void SdrAudioPlayerWindow::Resize()
 
 void SdrAudioPlayerWindow::MouseMove(const MouseEvent& rMEvt)
 {
-    // Forward to the parent window for proper coordinate transformation
+    // Forward to the parent window using the same coordinate transformation as SdrMediaWindow
     vcl::Window* pWindow = mrViewObjectContactOfSdrMediaObj.getWindow();
     
-    if (pWindow && GetParent())
+    if (pWindow)
     {
         const MouseEvent aTransformedEvent(
-            pWindow->ScreenToOutputPixel(GetParent()->OutputToScreenPixel(rMEvt.GetPosPixel())),
+            pWindow->ScreenToOutputPixel(OutputToScreenPixel(rMEvt.GetPosPixel())),
             rMEvt.GetClicks(), rMEvt.GetMode(), rMEvt.GetButtons(), rMEvt.GetModifier());
         
         pWindow->MouseMove(aTransformedEvent);
@@ -199,12 +200,12 @@ void SdrAudioPlayerWindow::MouseButtonDown(const MouseEvent& rMEvt)
         mpAudioPlayerControl->HandleMouseClick(rMEvt);
     }
     
-    // Then forward to parent for proper handling
+    // Then forward to parent for proper handling using same coordinate transformation as SdrMediaWindow
     vcl::Window* pWindow = mrViewObjectContactOfSdrMediaObj.getWindow();
-    if (pWindow && GetParent())
+    if (pWindow)
     {
         const MouseEvent aTransformedEvent(
-            pWindow->ScreenToOutputPixel(GetParent()->OutputToScreenPixel(rMEvt.GetPosPixel())),
+            pWindow->ScreenToOutputPixel(OutputToScreenPixel(rMEvt.GetPosPixel())),
             rMEvt.GetClicks(), rMEvt.GetMode(), rMEvt.GetButtons(), rMEvt.GetModifier());
         
         pWindow->MouseButtonDown(aTransformedEvent);
@@ -215,10 +216,10 @@ void SdrAudioPlayerWindow::MouseButtonUp(const MouseEvent& rMEvt)
 {
     vcl::Window* pWindow = mrViewObjectContactOfSdrMediaObj.getWindow();
     
-    if (pWindow && GetParent())
+    if (pWindow)
     {
         const MouseEvent aTransformedEvent(
-            pWindow->ScreenToOutputPixel(GetParent()->OutputToScreenPixel(rMEvt.GetPosPixel())),
+            pWindow->ScreenToOutputPixel(OutputToScreenPixel(rMEvt.GetPosPixel())),
             rMEvt.GetClicks(), rMEvt.GetMode(), rMEvt.GetButtons(), rMEvt.GetModifier());
         
         pWindow->MouseButtonUp(aTransformedEvent);
@@ -246,7 +247,13 @@ void SdrAudioPlayerWindow::Command(const CommandEvent& rCEvt)
     vcl::Window* pWindow = mrViewObjectContactOfSdrMediaObj.getWindow();
     
     if (pWindow)
-        pWindow->Command(rCEvt);
+    {
+        const CommandEvent aTransformedEvent(
+            pWindow->ScreenToOutputPixel(OutputToScreenPixel(rCEvt.GetMousePosPixel())),
+            rCEvt.GetCommand(), rCEvt.IsMouseEvent(), rCEvt.GetEventData());
+        
+        pWindow->Command(aTransformedEvent);
+    }
 }
 
 } // namespace sdr::contact
