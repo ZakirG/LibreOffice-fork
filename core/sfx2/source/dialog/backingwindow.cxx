@@ -69,8 +69,10 @@
 #include <com/sun/star/frame/Desktop.hpp>
 #include <com/sun/star/frame/XModel2.hpp>
 #include <com/sun/star/frame/XModel3.hpp>
+#include <com/sun/star/frame/XTitle.hpp>
 #include <com/sun/star/beans/PropertyValue.hpp>
 #include <com/sun/star/lang/XComponent.hpp>
+#include <rtl/uri.hxx>
 #include <unotools/tempfile.hxx>
 #include <tools/stream.hxx>
 #include <comphelper/errcode.hxx>
@@ -1113,32 +1115,40 @@ void BackingWindow::handleCloudDocumentOpening(const OUString& sCloudUrl)
                 std::cerr << "*** CLOUD DEBUG: Component loaded successfully" << std::endl;
                 SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: Component loaded successfully");
                 
-                // Try to query for different interfaces to see what's available
-                css::uno::Reference<css::frame::XModel> xModel(xComponent, css::uno::UNO_QUERY);
-                if (xModel.is()) {
-                    std::cerr << "*** CLOUD DEBUG: XModel interface is available" << std::endl;
-                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: XModel interface is available");
-                } else {
-                    std::cerr << "*** CLOUD DEBUG: WARNING - XModel interface is NOT available" << std::endl;
-                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: WARNING - XModel interface is NOT available");
-                }
-                
-                css::uno::Reference<css::frame::XModel2> xModel2(xComponent, css::uno::UNO_QUERY);
-                if (xModel2.is()) {
-                    std::cerr << "*** CLOUD DEBUG: XModel2 interface is available" << std::endl;
-                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: XModel2 interface is available");
-                } else {
-                    std::cerr << "*** CLOUD DEBUG: WARNING - XModel2 interface is NOT available" << std::endl;
-                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: WARNING - XModel2 interface is NOT available");
-                }
-                
-                css::uno::Reference<css::frame::XModel3> xModel3(xComponent, css::uno::UNO_QUERY);
-                if (xModel3.is()) {
-                    std::cerr << "*** CLOUD DEBUG: XModel3 interface is available" << std::endl;
-                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: XModel3 interface is available");
-                } else {
-                    std::cerr << "*** CLOUD DEBUG: WARNING - XModel3 interface is NOT available" << std::endl;
-                    SAL_WARN("sfx.dialog", "*** CLOUD DEBUG: WARNING - XModel3 interface is NOT available");
+                // Extract filename from presigned URL and set document title
+                OUString sOriginalFileName;
+                sal_Int32 nFilenamePos = sPresignedUrl.indexOf("filename%2A%3DUTF-8%27%27");
+                if (nFilenamePos != -1)
+                {
+                    sal_Int32 nStartPos = nFilenamePos + 25; // Length of "filename%2A%3DUTF-8%27%27"
+                    sal_Int32 nEndPos = sPresignedUrl.indexOf("&", nStartPos);
+                    if (nEndPos == -1) nEndPos = sPresignedUrl.getLength();
+                    
+                    std::cerr << "*** CLOUD DEBUG: nFilenamePos=" << nFilenamePos << ", nStartPos=" << nStartPos << ", nEndPos=" << nEndPos << std::endl;
+                    
+                    OUString sEncodedFilename = sPresignedUrl.copy(nStartPos, nEndPos - nStartPos);
+                    std::cerr << "*** CLOUD DEBUG: Raw encoded filename: " << sEncodedFilename << std::endl;
+                    
+                    sOriginalFileName = rtl::Uri::decode(sEncodedFilename, rtl_UriDecodeWithCharset, RTL_TEXTENCODING_UTF8);
+                    
+                    std::cerr << "*** CLOUD DEBUG: Extracted filename: " << sOriginalFileName << std::endl;
+                    
+                    // Set the document title using XTitle interface
+                    css::uno::Reference<css::frame::XTitle> xTitle(xComponent, css::uno::UNO_QUERY);
+                    if (xTitle.is()) {
+                        xTitle->setTitle(sOriginalFileName);
+                        std::cerr << "*** CLOUD DEBUG: Document title set to: " << sOriginalFileName << std::endl;
+                    } else {
+                        // Try with XModel interface
+                        css::uno::Reference<css::frame::XModel> xModel(xComponent, css::uno::UNO_QUERY);
+                        if (xModel.is()) {
+                            css::uno::Reference<css::frame::XTitle> xModelTitle(xModel, css::uno::UNO_QUERY);
+                            if (xModelTitle.is()) {
+                                xModelTitle->setTitle(sOriginalFileName);
+                                std::cerr << "*** CLOUD DEBUG: Document title set via XModel to: " << sOriginalFileName << std::endl;
+                            }
+                        }
+                    }
                 }
                 
                 std::cerr << "*** CLOUD DEBUG: Cloud document opened successfully: " << sCloudUrl << std::endl;
