@@ -181,31 +181,52 @@ c. **Dialog Controller:** A new controller class, `SmartRewriteDialogController`
 - **Platform-Specific Code:** This feature will likely require writing platform-specific code for each operating system.
 - **Font Caching:** We need to understand how LibreOffice caches fonts to ensure that newly added fonts are immediately available.
 
-## 6. Playable MP3 Files
+## 6. Playable Audio Files
 
-When a user drags in an mp3 file into a text document, the displayed preview should have a play/pause button in the preview that plays the audio file when clicked.
+We already have the functionality to drag in an audio file into the document and see a media representation of it. But there is no filename display and the media is not playable. We'll be changing that.
+When a user drags in an audio file (e.g., `.mp3`, `.wav`, `.m4a`) into a text document, the displayed preview should have a play/pause button that plays the audio file when clicked.
 In addition, instead of the media preview being a square (it is currently a square with a big musical note icon in the middle) it should be a wide rectangle with a play/pause button in the middle of it and a filename string underneath that button. we will remove the current musical note icon from the preview.
 
-### Relevant Modules:
-- **`sd` (Draw/Impress):** This module has the most sophisticated handling of embedded objects.
-    - The `sd/README.md` mentions `drawingml` as the component responsible for handling shapes. We will likely need to create a new type of shape or embedded object to represent the MP3 player.
-- **`avmedia`:** This module likely contains the code for handling audio and video playback. We will need to investigate how to use it to play the embedded MP3 file.
-- **`vcl` (Visual Class Library):** This module handles drag and drop.
-    - The drag and drop mechanism is platform-specific. On Windows, it is implemented using the `IDropTarget` COM interface in `vcl/win/dtrans/idroptarget.cxx`. This class delegates the work to a `DropTarget` class.
-    - **Deeper Dive:** The `DropTarget` class, defined in `vcl/inc/win/dnd_target.hxx`, is a C++ implementation of the `XDropTarget` UNO interface.
-        - The `DropTarget::Drop` method is the entry point for handling a drop event. It receives a `DropTargetEvent` object that contains information about the dropped data, including the data's format and the drop location.
-        - To implement our feature, we will need to create a new `DropTargetListener` and register it with the `DropTarget`. The listener will need to check if the dropped data is a file and if that file is an MP3.
-        - If the dropped file is an MP3, the listener will need to create a new media object. The `avmedia` module, which handles audio and video playback, is likely the correct place to look for a suitable media object implementation. We will need to investigate how to create a media object and insert it into the document at the drop location.
-        - The `slideshow` module might also contain relevant code for handling media objects, as it is responsible for displaying presentations with embedded media.
+### Technical Implementation Plan
 
-### Key Interfaces:
-- **`com.sun.star.datatransfer.dnd.XDropTargetListener`:** We will need to implement this interface to handle the drop event.
-- **`com.sun.star.media.XPlayer`:** This interface provides the basic controls for playing media files. We will need to use this interface to create a custom media player for the embedded MP3 files.
-- **`com.sun.star.drawing.XShape`:** The base interface for all shapes. We will likely need to create a custom shape that represents the MP3 player.
+Our implementation will focus on replacing the default static media object preview with a custom, interactive control for audio files. This involves creating a new UI control for the player and modifying the rendering pipeline to use it for supported audio formats (`.mp3`, `.wav`, `.m4a`).
 
-### Conventions and Considerations:
-- **Object Model:** We need to decide how to represent the MP3 file in the document's object model. It could be a special type of frame or a custom shape.
-- **Filters:** We will need to modify the ODF import/export filters (in `xmloff`) to ensure that the embedded MP3 files are saved and loaded correctly. We may also need to consider how this feature interacts with other file formats, like DOCX and PPTX. 
+#### 1. Create a Custom `AudioPlayerControl`
+
+A new class, `AudioPlayerControl`, will be created within the `vcl` module. This class will inherit from `vcl::Control` and will be responsible for the entire visual representation and functionality of the audio player.
+
+- **`vcl/source/control/audioplayer.cxx` and `vcl/inc/audioplayer.hxx`:** New files will be created to house the implementation of `AudioPlayerControl`.
+- **UI Components:** This control will manage:
+    - A play/pause button.
+    - A text label to display the audio filename.
+- **Playback Logic:** The `AudioPlayerControl` will use the `avmedia::Player` class from the `avmedia` module to handle the actual audio playback. It will be responsible for loading the audio file from its URL and managing play/pause states.
+- **Event Handling:** The control will implement `MouseButtonDown` event handlers to toggle playback when the user clicks the play/pause button.
+
+#### 2. Modify `MediaPrimitive2D` to Use the New Control
+
+The `MediaPrimitive2D` is responsible for rendering the generic media object. We will modify its `create2DDecomposition` method to special-case audio files.
+
+- **`core/drawinglayer/source/primitive2d/mediaprimitive2d.cxx`:**
+    - In the `create2DDecomposition` method, we will add a check for the media's file extension (`.mp3`, `.wav`, `.m4a`).
+    - If the media is identified as a supported audio file, instead of creating a `GraphicPrimitive2D` for the default icon, the code will instantiate our new `AudioPlayerControl`.
+    - The existing logic for drawing the background and border will be preserved.
+
+#### 3. Enhance `ViewContactOfSdrMediaObj` to Pass Data
+
+The `ViewContactOfSdrMediaObj` class needs to be updated to provide the necessary information (like the filename) to the rendering layer.
+
+- **`core/svx/source/sdr/contact/viewcontactofsdrmediaobj.cxx`:**
+    - The `createViewIndependentPrimitive2DSequence` method will be modified.
+    - It will extract the filename from the `SdrMediaObj`'s URL.
+    - This filename string will be passed down to the `MediaPrimitive2D` and subsequently to the `AudioPlayerControl` for display.
+
+#### 4. Reshaping the Media Object
+
+The current media object is a square. We will modify the object's geometry when it's identified as a supported audio file.
+
+- **`core/svx/source/svdraw/svdomedia.cxx`:** When a supported audio file is dropped, we will need to adjust the default `SdrMediaObj`'s `SetGeoRect` to create a wide rectangle instead of a square, to better accommodate the player UI.
+
+This approach ensures that our changes are well-encapsulated. We create a new, self-contained UI component for the audio player and then selectively use it within the existing rendering framework without disrupting the handling of other media types.
 
 ## 6. General Conventions and Patterns
 
