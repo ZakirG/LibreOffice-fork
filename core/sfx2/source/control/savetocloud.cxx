@@ -123,6 +123,7 @@ bool SaveToCloudHandler::Execute(SfxRequest& rReq)
         
         // Store the existing doc ID for later use
         m_sCloudDocumentId = sExistingCloudDocId;
+        std::cerr << "*** CLOUD DEBUG: Set m_sCloudDocumentId to: " << m_sCloudDocumentId << std::endl;
     }
     else
     {
@@ -491,6 +492,9 @@ bool SaveToCloudHandler::uploadToCloud(const std::vector<char>& rDocumentData, c
         return false;
     }
 
+    std::cerr << "*** CLOUD DEBUG: uploadToCloud() called with m_sCloudDocumentId = '" << m_sCloudDocumentId << "'" << std::endl;
+    std::cerr << "*** CLOUD DEBUG: isEmpty() = " << (m_sCloudDocumentId.isEmpty() ? "TRUE" : "FALSE") << std::endl;
+
     try
     {
         OUString sPresignedUrl, sDocId;
@@ -501,7 +505,7 @@ bool SaveToCloudHandler::uploadToCloud(const std::vector<char>& rDocumentData, c
             std::cerr << "*** CLOUD DEBUG: Updating existing document with ID: " << m_sCloudDocumentId << std::endl;
             sDocId = m_sCloudDocumentId;
             
-            if (!m_pApiClient->requestPresignedUrlForDocument(sDocId, "put", sPresignedUrl))
+            if (!m_pApiClient->requestPresignedUrlForDocument(sDocId, "put", sFileName, sContentType, sPresignedUrl))
             {
                 SAL_WARN("sfx.control", "Failed to get presigned URL for existing document update");
                 return false;
@@ -560,8 +564,15 @@ bool SaveToCloudHandler::uploadToCloud(const std::vector<char>& rDocumentData, c
         }
         else
         {
-            // This is an update to existing document, no need to register
-            std::cerr << "*** CLOUD DEBUG: Skipping registration for existing document update" << std::endl;
+            // This is an update to existing document, update the metadata instead of registering
+            std::cerr << "*** CLOUD DEBUG: Updating existing document metadata" << std::endl;
+            
+            if (!m_pApiClient->updateDocumentMetadata(sDocId, sFileName, nFileSize))
+            {
+                SAL_WARN("sfx.control", "Failed to update document metadata");
+                // Don't fail the upload if metadata update fails, just warn
+                std::cerr << "*** CLOUD DEBUG: Warning - metadata update failed, but upload succeeded" << std::endl;
+            }
         }
 
         std::cerr << "*** CLOUD DEBUG: Document uploaded successfully, docId: " << sDocId << std::endl;
@@ -583,28 +594,62 @@ CloudUploadResult SaveToCloudHandler::uploadToCloudWithErrorHandling(const std::
         return CloudUploadResult::GENERAL_ERROR;
     }
 
+    std::cerr << "*** CLOUD DEBUG: uploadToCloudWithErrorHandling() called with m_sCloudDocumentId = '" << m_sCloudDocumentId << "'" << std::endl;
+    std::cerr << "*** CLOUD DEBUG: isEmpty() = " << (m_sCloudDocumentId.isEmpty() ? "TRUE" : "FALSE") << std::endl;
+
     try
     {
-        // Request presigned URL for upload
-        std::cerr << "*** DEBUG: Requesting presigned URL for file: " << OUStringToOString(sFileName, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
-        std::cerr << "*** DEBUG: Content type: " << OUStringToOString(sContentType, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
-        SAL_WARN("sfx.control", "Requesting presigned URL for: " << sFileName);
-        
         OUString sPresignedUrl, sDocId;
-        if (!m_pApiClient->requestPresignedUrl("put", sFileName, sContentType, sPresignedUrl, sDocId))
+        
+        if (!m_sCloudDocumentId.isEmpty())
         {
-            // Check if this was an auth error by looking at the response code
-            long nLastResponseCode = m_pApiClient->getLastResponseCode();
-            if (nLastResponseCode == 401)
+            // Update existing cloud document
+            std::cerr << "*** CLOUD DEBUG: Updating existing document with ID: " << m_sCloudDocumentId << std::endl;
+            sDocId = m_sCloudDocumentId;
+            
+            if (!m_pApiClient->requestPresignedUrlForDocument(sDocId, "put", sFileName, sContentType, sPresignedUrl))
             {
-                std::cerr << "*** DEBUG: 401 Authentication error detected ***" << std::endl;
-                SAL_WARN("sfx.control", "Authentication expired (401) while requesting presigned URL");
-                return CloudUploadResult::AUTH_EXPIRED;
+                // Check if this was an auth error by looking at the response code
+                long nLastResponseCode = m_pApiClient->getLastResponseCode();
+                if (nLastResponseCode == 401)
+                {
+                    std::cerr << "*** DEBUG: 401 Authentication error detected ***" << std::endl;
+                    SAL_WARN("sfx.control", "Authentication expired (401) while requesting presigned URL");
+                    return CloudUploadResult::AUTH_EXPIRED;
+                }
+                
+                std::cerr << "*** DEBUG: FAILED to get presigned URL for existing document ***" << std::endl;
+                SAL_WARN("sfx.control", "Failed to get presigned URL for existing document update");
+                return CloudUploadResult::GENERAL_ERROR;
             }
             
-            std::cerr << "*** DEBUG: FAILED to get presigned URL ***" << std::endl;
-            SAL_WARN("sfx.control", "Failed to get presigned URL for upload");
-            return CloudUploadResult::GENERAL_ERROR;
+            std::cerr << "*** CLOUD DEBUG: Got presigned URL for document update" << std::endl;
+        }
+        else
+        {
+            // Create new cloud document
+            std::cerr << "*** CLOUD DEBUG: Creating new cloud document" << std::endl;
+            std::cerr << "*** DEBUG: Requesting presigned URL for file: " << OUStringToOString(sFileName, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+            std::cerr << "*** DEBUG: Content type: " << OUStringToOString(sContentType, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+            SAL_WARN("sfx.control", "Requesting presigned URL for: " << sFileName);
+            
+            if (!m_pApiClient->requestPresignedUrl("put", sFileName, sContentType, sPresignedUrl, sDocId))
+            {
+                // Check if this was an auth error by looking at the response code
+                long nLastResponseCode = m_pApiClient->getLastResponseCode();
+                if (nLastResponseCode == 401)
+                {
+                    std::cerr << "*** DEBUG: 401 Authentication error detected ***" << std::endl;
+                    SAL_WARN("sfx.control", "Authentication expired (401) while requesting presigned URL");
+                    return CloudUploadResult::AUTH_EXPIRED;
+                }
+                
+                std::cerr << "*** DEBUG: FAILED to get presigned URL ***" << std::endl;
+                SAL_WARN("sfx.control", "Failed to get presigned URL for upload");
+                return CloudUploadResult::GENERAL_ERROR;
+            }
+            
+            std::cerr << "*** CLOUD DEBUG: Got presigned URL for new document, docId: " << sDocId << std::endl;
         }
 
         std::cerr << "*** DEBUG: SUCCESS - Got presigned URL ***" << std::endl;
@@ -643,20 +688,47 @@ CloudUploadResult SaveToCloudHandler::uploadToCloudWithErrorHandling(const std::
         // Calculate file size
         sal_Int64 nFileSize = static_cast<sal_Int64>(rDocumentData.size());
 
-        // Register document metadata
-        if (!m_pApiClient->registerDocument(sDocId, sFileName, nFileSize))
+        // Register or update document metadata
+        if (m_sCloudDocumentId.isEmpty())
         {
-            // Check if this was an auth error 
-            long nRegisterResponseCode = m_pApiClient->getLastResponseCode();
-            if (nRegisterResponseCode == 401)
-            {
-                std::cerr << "*** DEBUG: 401 Authentication error during document registration ***" << std::endl;
-                SAL_WARN("sfx.control", "Authentication expired (401) while registering document");
-                return CloudUploadResult::AUTH_EXPIRED;
-            }
+            // This is a new document, register its metadata
+            std::cerr << "*** CLOUD DEBUG: Registering new document metadata" << std::endl;
             
-            SAL_WARN("sfx.control", "Failed to register document metadata");
-            return CloudUploadResult::GENERAL_ERROR;
+            if (!m_pApiClient->registerDocument(sDocId, sFileName, nFileSize))
+            {
+                // Check if this was an auth error 
+                long nRegisterResponseCode = m_pApiClient->getLastResponseCode();
+                if (nRegisterResponseCode == 401)
+                {
+                    std::cerr << "*** DEBUG: 401 Authentication error during document registration ***" << std::endl;
+                    SAL_WARN("sfx.control", "Authentication expired (401) while registering document");
+                    return CloudUploadResult::AUTH_EXPIRED;
+                }
+                
+                SAL_WARN("sfx.control", "Failed to register document metadata");
+                return CloudUploadResult::GENERAL_ERROR;
+            }
+        }
+        else
+        {
+            // This is an update to existing document, update the metadata instead of registering
+            std::cerr << "*** CLOUD DEBUG: Updating existing document metadata" << std::endl;
+            
+            if (!m_pApiClient->updateDocumentMetadata(sDocId, sFileName, nFileSize))
+            {
+                // Check if this was an auth error 
+                long nUpdateResponseCode = m_pApiClient->getLastResponseCode();
+                if (nUpdateResponseCode == 401)
+                {
+                    std::cerr << "*** DEBUG: 401 Authentication error during document metadata update ***" << std::endl;
+                    SAL_WARN("sfx.control", "Authentication expired (401) while updating document metadata");
+                    return CloudUploadResult::AUTH_EXPIRED;
+                }
+                
+                SAL_WARN("sfx.control", "Failed to update document metadata");
+                // Don't fail the upload if metadata update fails, just warn
+                std::cerr << "*** CLOUD DEBUG: Warning - metadata update failed, but upload succeeded" << std::endl;
+            }
         }
 
         SAL_WARN("sfx.control", "Document uploaded successfully, docId: " << sDocId);

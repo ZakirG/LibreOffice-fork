@@ -181,7 +181,10 @@ c. **Dialog Controller:** A new controller class, `SmartRewriteDialogController`
 - **Platform-Specific Code:** This feature will likely require writing platform-specific code for each operating system.
 - **Font Caching:** We need to understand how LibreOffice caches fonts to ensure that newly added fonts are immediately available.
 
-## 6. Draggable and Playable MP3 Files
+## 6. Playable MP3 Files
+
+When a user drags in an mp3 file into a text document, the displayed preview should have a play/pause button in the preview that plays the audio file when clicked.
+In addition, instead of the media preview being a square (it is currently a square with a big musical note icon in the middle) it should be a wide rectangle with a play/pause button in the middle of it and a filename string underneath that button. we will remove the current musical note icon from the preview.
 
 ### Relevant Modules:
 - **`sd` (Draw/Impress):** This module has the most sophisticated handling of embedded objects.

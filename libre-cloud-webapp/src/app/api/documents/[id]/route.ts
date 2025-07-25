@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { validateAuth } from '@/lib/auth';
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
@@ -21,11 +22,13 @@ interface RouteParams {
 
 export async function PATCH(request: NextRequest, context: RouteParams) {
   try {
-    const { userId } = await auth();
-
-    if (!userId) {
+    // Validate JWT token (supports both Clerk and custom desktop JWT)
+    const authPayload = await validateAuth(request);
+    if (!authPayload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const userId = authPayload.userId;
 
     const { id: documentId } = await context.params;
 
@@ -109,11 +112,13 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
 
 export async function GET(request: NextRequest, context: RouteParams) {
   try {
-    const { userId } = await auth();
-
-    if (!userId) {
+    // Validate JWT token (supports both Clerk and custom desktop JWT)
+    const authPayload = await validateAuth(request);
+    if (!authPayload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const userId = authPayload.userId;
 
     const { id: documentId } = await context.params;
 

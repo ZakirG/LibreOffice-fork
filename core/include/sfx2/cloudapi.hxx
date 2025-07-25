@@ -109,10 +109,14 @@ public:
      * Request presigned URL for an existing document (by document ID)
      * @param sDocId Document ID 
      * @param sMode "get" for download, "put" for upload
+     * @param sFileName File name (required for PUT operations)
+     * @param sContentType MIME type (required for PUT operations)
      * @param rsPresignedUrl [out] Presigned URL
      * @return true if successful
      */
-    bool requestPresignedUrlForDocument(const OUString& sDocId, const OUString& sMode, OUString& rsPresignedUrl);
+    bool requestPresignedUrlForDocument(const OUString& sDocId, const OUString& sMode, 
+                                       const OUString& sFileName, const OUString& sContentType,
+                                       OUString& rsPresignedUrl);
 
     /**
      * Download document content from presigned URL
@@ -121,6 +125,15 @@ public:
      * @return true if successful
      */
     bool downloadDocument(const OUString& sPresignedUrl, std::vector<char>& rDocumentData);
+
+    /**
+     * Update document metadata (lastModified, fileSize, etc.)
+     * @param sDocId Document ID to update
+     * @param sFileName File name
+     * @param nFileSize File size in bytes
+     * @return true if successful
+     */
+    bool updateDocumentMetadata(const OUString& sDocId, const OUString& sFileName, sal_Int64 nFileSize);
 
     /**
      * Upload binary data to URL (for presigned URL uploads)
@@ -164,7 +177,21 @@ private:
      */
     bool httpDelete(const OUString& sUrl, OUString& rsResponse, long* pnResponseCode = nullptr);
 
+    /**
+     * Perform HTTP PATCH request
+     * @param sUrl URL to request
+     * @param sBody Request body (JSON)
+     * @param rsResponse [out] Response body
+     * @param pnResponseCode [out] HTTP response code (optional)
+     * @return true if request completed successfully
+     */
+    bool httpPatch(const OUString& sUrl, const OUString& sBody, OUString& rsResponse, long* pnResponseCode = nullptr);
 
+    /**
+     * Get current timestamp in ISO 8601 format
+     * @return Current timestamp as ISO string
+     */
+    OUString getCurrentISOTimestamp();
 
     /**
      * Set up common curl options

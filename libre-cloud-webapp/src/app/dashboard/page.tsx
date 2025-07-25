@@ -105,7 +105,16 @@ export default function DashboardPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setDocuments(data.documents || []);
+        const documents = data.documents || [];
+        
+        // Sort documents by most recent first (lastModified or uploadedAt)
+        const sortedDocuments = documents.sort((a: any, b: any) => {
+          const dateA = new Date(a.lastModified || a.uploadedAt);
+          const dateB = new Date(b.lastModified || b.uploadedAt);
+          return dateB.getTime() - dateA.getTime(); // Most recent first
+        });
+        
+        setDocuments(sortedDocuments);
       } else {
         console.error('Failed to load documents');
       }

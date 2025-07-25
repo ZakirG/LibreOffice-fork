@@ -18,6 +18,8 @@
 #include <iostream>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
+#include <ctime>
 
 namespace
 {
@@ -341,7 +343,9 @@ bool CloudApiClient::deleteDocument(const OUString& sDocId)
     return nResponseCode == 200;
 }
 
-bool CloudApiClient::requestPresignedUrlForDocument(const OUString& sDocId, const OUString& sMode, OUString& rsPresignedUrl)
+bool CloudApiClient::requestPresignedUrlForDocument(const OUString& sDocId, const OUString& sMode, 
+                                                   const OUString& sFileName, const OUString& sContentType,
+                                                   OUString& rsPresignedUrl)
 {
     if (!m_pCurl || m_sJwtToken.isEmpty() || sDocId.isEmpty())
     {
@@ -351,12 +355,21 @@ bool CloudApiClient::requestPresignedUrlForDocument(const OUString& sDocId, cons
 
     OUString sUrl = m_sBaseUrl + "/api/presign";
     
-    // Create JSON request body with mode and docId
-    OUString sRequestBody = "{\"mode\":\"" + sMode + "\",\"docId\":\"" + sDocId + "\"}";
+    // Create JSON request body with mode, docId, fileName, and contentType
+    OUString sRequestBody = "{\"mode\":\"" + sMode + "\",\"docId\":\"" + sDocId + "\"";
+    if (!sFileName.isEmpty()) {
+        sRequestBody += ",\"fileName\":\"" + sFileName + "\"";
+    }
+    if (!sContentType.isEmpty()) {
+        sRequestBody += ",\"contentType\":\"" + sContentType + "\"";
+    }
+    sRequestBody += "}";
+    
     OUString sResponse;
     long nResponseCode = 0;
 
     SAL_WARN("sfx.control", "Requesting presigned URL for document: " << sDocId << " mode: " << sMode);
+    std::cerr << "*** DEBUG: Request body for existing document: " << sRequestBody << " ***" << std::endl;
 
     if (!httpPost(sUrl, sRequestBody, sResponse, &nResponseCode))
     {
@@ -529,6 +542,45 @@ bool CloudApiClient::downloadDocument(const OUString& sPresignedUrl, std::vector
     }
 }
 
+bool CloudApiClient::updateDocumentMetadata(const OUString& sDocId, const OUString& sFileName, sal_Int64 nFileSize)
+{
+    if (!m_pCurl || m_sJwtToken.isEmpty() || sDocId.isEmpty())
+    {
+        SAL_WARN("sfx.control", "CloudApiClient::updateDocumentMetadata - Invalid parameters");
+        return false;
+    }
+
+    OUString sUrl = m_sBaseUrl + "/api/documents/" + sDocId;
+    
+    // Create JSON request body with metadata updates
+    OUString sCurrentTime = getCurrentISOTimestamp();
+    OUString sRequestBody = "{\"lastModified\":\"" + sCurrentTime + "\","
+                           "\"fileName\":\"" + sFileName + "\","
+                           "\"fileSize\":" + OUString::number(nFileSize) + "}";
+    
+    OUString sResponse;
+    long nResponseCode = 0;
+
+    std::cerr << "*** CLOUD DEBUG: Updating document metadata for docId: " << sDocId << std::endl;
+    std::cerr << "*** CLOUD DEBUG: Metadata update body: " << sRequestBody << std::endl;
+
+    if (!httpPatch(sUrl, sRequestBody, sResponse, &nResponseCode))
+    {
+        SAL_WARN("sfx.control", "Failed to update document metadata");
+        return false;
+    }
+
+    if (nResponseCode != 200)
+    {
+        SAL_WARN("sfx.control", "Document metadata update failed with code: " << nResponseCode);
+        return false;
+    }
+
+    std::cerr << "*** CLOUD DEBUG: Document metadata updated successfully" << std::endl;
+    SAL_WARN("sfx.control", "Document metadata updated successfully for docId: " << sDocId);
+    return true;
+}
+
 // Private helper methods
 
 bool CloudApiClient::httpGet(const OUString& sUrl, OUString& rsResponse, long* pnResponseCode)
@@ -646,8 +698,11 @@ bool CloudApiClient::httpPost(const OUString& sUrl, const OUString& sBody, OUStr
     
     if (!m_sJwtToken.isEmpty()) {
         std::cerr << "*** DEBUG: Adding authentication header ***" << std::endl;
+        std::cerr << "*** DEBUG: JWT token length for POST: " << m_sJwtToken.getLength() << " ***" << std::endl;
+        std::cerr << "*** DEBUG: JWT token preview for POST: " << OUStringToOString(m_sJwtToken.copy(0, 50), RTL_TEXTENCODING_UTF8).getStr() << "... ***" << std::endl;
         OString sAuthHeader = "Authorization: Bearer " + OUStringToOString(m_sJwtToken, RTL_TEXTENCODING_UTF8);
         headers = curl_slist_append(headers, sAuthHeader.getStr());
+        std::cerr << "*** DEBUG: Auth header length for POST: " << sAuthHeader.getLength() << " ***" << std::endl;
     }
     
     curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, headers);
@@ -759,6 +814,114 @@ bool CloudApiClient::httpDelete(const OUString& sUrl, OUString& rsResponse, long
         SAL_WARN("sfx.control", "HTTP DELETE failed: " << curl_easy_strerror(res));
         return false;
     }
+}
+
+bool CloudApiClient::httpPatch(const OUString& sUrl, const OUString& sBody, OUString& rsResponse, long* pnResponseCode)
+{
+    if (!m_pCurl)
+        return false;
+
+    std::cerr << "*** DEBUG: httpPatch() called ***" << std::endl;
+    std::cerr << "*** DEBUG: URL: " << OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+    std::cerr << "*** DEBUG: Request body: " << OUStringToOString(sBody, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+
+    // Reset curl options for clean PATCH request
+    std::cerr << "*** DEBUG: Resetting curl options for clean PATCH request ***" << std::endl;
+    curl_easy_reset(m_pCurl);
+    setupCommonOptions();
+
+    // Set URL
+    curl_easy_setopt(m_pCurl, CURLOPT_URL, OUStringToOString(sUrl, RTL_TEXTENCODING_UTF8).getStr());
+    
+    // Disable GET and enable POST-like functionality
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPGET, 0L);
+    curl_easy_setopt(m_pCurl, CURLOPT_POST, 1L);
+
+    // Set PATCH method explicitly
+    curl_easy_setopt(m_pCurl, CURLOPT_CUSTOMREQUEST, "PATCH");
+
+    // Set request body
+    OString sBodyUtf8 = OUStringToOString(sBody, RTL_TEXTENCODING_UTF8);
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDS, sBodyUtf8.getStr());
+    curl_easy_setopt(m_pCurl, CURLOPT_POSTFIELDSIZE, sBodyUtf8.getLength());
+
+    // Set up response handling
+    CurlResponse response;
+    curl_easy_setopt(m_pCurl, CURLOPT_WRITEFUNCTION, writeCallback);
+    curl_easy_setopt(m_pCurl, CURLOPT_WRITEDATA, &response);
+
+    // Set headers
+    struct curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    
+    // Add JWT auth header
+    if (!m_sJwtToken.isEmpty())
+    {
+        OString sAuthHeader = "Authorization: Bearer " + OUStringToOString(m_sJwtToken, RTL_TEXTENCODING_UTF8);
+        headers = curl_slist_append(headers, sAuthHeader.getStr());
+        std::cerr << "*** DEBUG: Adding authentication header ***" << std::endl;
+        std::cerr << "*** DEBUG: JWT token length: " << m_sJwtToken.getLength() << " ***" << std::endl;
+        std::cerr << "*** DEBUG: JWT token preview for PATCH: " << OUStringToOString(m_sJwtToken.copy(0, 50), RTL_TEXTENCODING_UTF8).getStr() << "... ***" << std::endl;
+        std::cerr << "*** DEBUG: Auth header length for PATCH: " << sAuthHeader.getLength() << " ***" << std::endl;
+    }
+
+    curl_easy_setopt(m_pCurl, CURLOPT_HTTPHEADER, headers);
+
+    // Perform the request
+    std::cerr << "*** DEBUG: Performing HTTP PATCH request ***" << std::endl;
+    CURLcode res = curl_easy_perform(m_pCurl);
+    
+    // Clean up headers
+    if (headers) {
+        curl_slist_free_all(headers);
+    }
+    
+    if (res == CURLE_OK)
+    {
+        if (pnResponseCode)
+        {
+            curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, pnResponseCode);
+            m_nLastResponseCode = *pnResponseCode;
+        }
+        else
+        {
+            curl_easy_getinfo(m_pCurl, CURLINFO_RESPONSE_CODE, &m_nLastResponseCode);
+        }
+        
+        std::cerr << "*** DEBUG: PATCH request completed with response code: " << m_nLastResponseCode << " ***" << std::endl;
+        rsResponse = OUString::fromUtf8(response.data.toString());
+        std::cerr << "*** DEBUG: PATCH response body: " << OUStringToOString(rsResponse, RTL_TEXTENCODING_UTF8).getStr() << " ***" << std::endl;
+        return true;
+    }
+    else
+    {
+        m_nLastResponseCode = 0; // Network error
+        std::cerr << "*** DEBUG: HTTP PATCH failed with curl error: " << curl_easy_strerror(res) << " ***" << std::endl;
+        SAL_WARN("sfx.control", "HTTP PATCH failed: " << curl_easy_strerror(res));
+        return false;
+    }
+}
+
+OUString CloudApiClient::getCurrentISOTimestamp()
+{
+    // Get current time
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    
+    // Format as ISO 8601 string
+    std::tm* tm = std::gmtime(&time_t);
+    char buffer[32];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S", tm);
+    
+    // Add milliseconds and Z for UTC
+    OString msStr = OString::number(ms.count());
+    // Pad milliseconds to 3 digits
+    while (msStr.getLength() < 3) {
+        msStr = "0" + msStr;
+    }
+    OString sTimestamp = OString(buffer) + "." + msStr + "Z";
+    return OUString::fromUtf8(sTimestamp);
 }
 
 bool CloudApiClient::uploadFile(const OUString& sUrl, const char* pData, size_t nDataSize, 

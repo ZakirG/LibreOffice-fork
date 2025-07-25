@@ -974,7 +974,7 @@ void BackingWindow::handleCloudDocumentOpening(const OUString& sCloudUrl)
         
         // Request presigned URL for document download
         OUString sPresignedUrl;
-        if (!pApiClient->requestPresignedUrlForDocument(sDocumentId, "get", sPresignedUrl))
+        if (!pApiClient->requestPresignedUrlForDocument(sDocumentId, "get", "", "", sPresignedUrl))
         {
             long nResponseCode = pApiClient->getLastResponseCode();
             if (nResponseCode == 401)
