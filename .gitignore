@@ -220,3 +220,6 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 .terraform.lock.hcl  # (Optional: commit only if you want deterministic provider versions)
+
+registrymodifications.xcu
+core/qadevOOo/qa/registrymodifications.xcu
