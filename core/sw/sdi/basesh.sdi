@@ -42,6 +42,8 @@ interface TextSelection : BaseTextSelection
         DisableFlags="SfxDisableFlags::SwOnProtectedCursor";
     ]
 
+
+
 }  // end interface Base
 
 shell SwBaseShell

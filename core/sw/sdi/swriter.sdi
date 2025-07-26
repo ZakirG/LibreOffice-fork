@@ -5694,6 +5694,7 @@ SfxVoidItem SendOutlineToStarImpress FN_OUTLINE_TO_IMPRESS
     GroupId = SfxGroupId::Document;
 ]
 
+
 SfxBoolItem SetAnchorAtChar FN_TOOL_ANCHOR_AT_CHAR
 ()
 [

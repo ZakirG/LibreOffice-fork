@@ -6417,5 +6417,33 @@
         </set>
       </group>
     </group>
+    <group oor:name="SmartRewrite">
+      <info>
+        <desc>Specifies settings for Smart Rewrite with AI feature.</desc>
+      </info>
+      <prop oor:name="ApiKey" oor:type="xs:string">
+        <info>
+          <desc>API key for external AI service (stored securely).</desc>
+        </info>
+      </prop>
+      <prop oor:name="EndpointUrl" oor:type="xs:string">
+        <info>
+          <desc>Endpoint URL for external AI service.</desc>
+        </info>
+        <value>https://api.openai.com/v1/chat/completions</value>
+      </prop>
+      <prop oor:name="Mode" oor:type="xs:string">
+        <info>
+          <desc>AI service mode or model to use for text rewriting.</desc>
+        </info>
+        <value>gpt-4</value>
+      </prop>
+      <prop oor:name="EnableFeature" oor:type="xs:boolean">
+        <info>
+          <desc>Enable or disable the Smart Rewrite feature.</desc>
+        </info>
+        <value>false</value>
+      </prop>
+    </group>
   </component>
 </oor:component-schema>

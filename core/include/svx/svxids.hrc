@@ -557,6 +557,7 @@ class XFillGradientItem;
 #define SID_DRAW_FREELINE                               ( SID_SVX_START + 463 )
 #define SID_DRAW_FREELINE_NOFILL                        ( SID_SVX_START + 464 )
 #define SID_DRAW_TEXT_MARQUEE                           ( SID_SVX_START + 465 )
+#define SID_SMART_REWRITE                               ( SID_SVX_START + 466 )
 #define SID_SWREGISTER_MODE                             TypedWhichId<SfxBoolItem>( SID_SVX_START + 467 )
 #define SID_GRFFILTER                                   ( SID_SVX_START + 469 )
 #define SID_GRFFILTER_INVERT                            ( SID_SVX_START + 470 )

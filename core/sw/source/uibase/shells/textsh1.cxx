@@ -39,6 +39,8 @@
 #include <svl/slstitm.hxx>
 #include <svl/stritem.hxx>
 #include <sfx2/htmlmode.hxx>
+#include <sfx2/sfxsids.hrc>
+#include <svx/svxids.hrc>
 #include <svl/whiter.hxx>
 #include <sfx2/bindings.hxx>
 #include <sfx2/namedcolor.hxx>
@@ -1227,6 +1229,22 @@ void SwTextShell::Execute(SfxRequest &rReq)
             // direct formatting flag.
             rWrtSh.ResetAttr( aAttribs );
 
+            rReq.Done();
+            break;
+        }
+        case SID_SMART_REWRITE:
+        {
+            // Get selected text
+            OUString sSelectedText;
+            rWrtSh.GetSelectedText(sSelectedText);
+            
+            if (!sSelectedText.isEmpty())
+            {
+                // TODO: Show the SmartRewrite dialog from Prompt 2
+                // For now, just log that the command works
+                std::cerr << "*** SUCCESS: Smart Rewrite command executed! Selected text: '" << sSelectedText.toUtf8().getStr() << "'" << std::endl;
+            }
+            
             rReq.Done();
             break;
         }
@@ -3568,9 +3586,23 @@ void SwTextShell::GetState( SfxItemSet &rSet )
     SwWrtShell &rSh = GetShell();
     SfxWhichIter aIter( rSet );
     sal_uInt16 nWhich = aIter.FirstWhich();
+    
+    // Debug: Check if our SID is being requested
+    static bool logged_sid = false;
+    if (!logged_sid) {
+        std::cerr << "*** DEBUG: SID_SMART_REWRITE value = " << SID_SMART_REWRITE << " (should be 10466)" << std::endl;
+        std::cerr << "*** DEBUG: SID_INSERT_HYPERLINK value = " << SID_INSERT_HYPERLINK << " (should be 10458)" << std::endl;
+        logged_sid = true;
+    }
+    
+    // Log when we see hyperlink command for comparison
+    if (nWhich == SID_INSERT_HYPERLINK) {
+        std::cerr << "*** DEBUG: Found SID_INSERT_HYPERLINK request! nWhich=" << nWhich << std::endl;
+    }
     while ( nWhich )
     {
         const sal_uInt16 nSlotId = GetPool().GetSlotId(nWhich);
+
         switch (nSlotId)
         {
         case FN_FORMAT_CURRENT_FOOTNOTE_DLG:
@@ -4314,6 +4346,22 @@ void SwTextShell::GetState( SfxItemSet &rSet )
                     rSet.DisableItem(nWhich);
                 }
             }
+            break;
+                                        case SID_SMART_REWRITE:
+        {
+            std::cerr << "*** DEBUG: SID_SMART_REWRITE GetState called! nWhich=" << nWhich << " SID_SMART_REWRITE=" << SID_SMART_REWRITE << std::endl;
+            // Enable only when text is selected (like Insert Hyperlink)
+            if (!rSh.HasSelection())
+            {
+                std::cerr << "*** DEBUG: SID_SMART_REWRITE - no selection, disabling" << std::endl;
+                rSet.DisableItem(nWhich);
+            }
+            else
+            {
+                std::cerr << "*** DEBUG: SID_SMART_REWRITE - text selected, enabling" << std::endl;
+            }
+            // If text is selected, leave it enabled (don't disable it)
+        }
             break;
         }
         nWhich = aIter.NextWhich();

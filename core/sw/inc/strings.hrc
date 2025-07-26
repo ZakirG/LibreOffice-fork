@@ -764,6 +764,8 @@
 
 #define STR_RESOLVED                            NC_("STR_RESOLVED", "RESOLVED")
 
+#define STR_SMARTREWRITE                        NC_("STR_SMARTREWRITE", "Smart Rewrite with AI")
+
 #define STR_MARGIN_TOOLTIP_LEFT                 NC_("STR_MARGIN_TOOLTIP_LEFT", "Left: ")
 #define STR_MARGIN_TOOLTIP_RIGHT                NC_("STR_MARGIN_TOOLTIP_RIGHT", ". Right: ")
 #define STR_MARGIN_TOOLTIP_INNER                NC_("STR_MARGIN_TOOLTIP_INNER", "Inner: ")

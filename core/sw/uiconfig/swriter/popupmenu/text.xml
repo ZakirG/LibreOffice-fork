@@ -20,6 +20,9 @@
     </menu:menupopup>
   </menu:menu>
   <menu:menuseparator/>
+  <menu:menuitem menu:id=".uno:InsertHyperlink"/>
+  <menu:menuitem menu:id=".uno:SmartRewrite"/>
+  <menu:menuseparator/>
   <menu:menuitem menu:id=".uno:UpdateCurIndex"/>
   <menu:menuitem menu:id=".uno:EditCurIndex"/>
   <menu:menuitem menu:id=".uno:RemoveTableOf"/>

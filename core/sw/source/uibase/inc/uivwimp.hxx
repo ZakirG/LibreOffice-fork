@@ -74,10 +74,12 @@ public:
 
 class SwMailMergeConfigItem;
 class SwXDispatchProviderInterceptor;
+// class SmartRewriteInterceptor; // DISABLED
 
 class SwView_Impl
 {
     rtl::Reference< SwXDispatchProviderInterceptor > m_xDispatchProviderInterceptor;
+    // rtl::Reference< SmartRewriteInterceptor > m_xSmartRewriteInterceptor; // DISABLED
     rtl::Reference< SwXTextView > mxXTextView;       // UNO object
     std::vector< unotools::WeakReference< SwTransferable > > mxTransferables;
 
@@ -158,6 +160,10 @@ public:
     SfxRequest*      GetRequest() const { return m_pRequest.get(); }
     sal_Int16        GetParam() const { return m_nParam; }
     void             SetParam( sal_Int16 nParam ) { m_nParam = nParam; }
+    
+    // DISABLED SmartRewriteInterceptor methods to isolate hang issue
+    // void InitializeSmartRewriteInterceptor();
+    // void ShutdownSmartRewriteInterceptor();
 };
 #endif
 

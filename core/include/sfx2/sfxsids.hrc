@@ -753,6 +753,9 @@ class SvxZoomItem;
 #define FID_CHG_RECORD          TypedWhichId<SfxBoolItem>(EDIT_MENU_START + 18)
 #define SID_CHG_PROTECT         TypedWhichId<SfxBoolItem>(SC_VIEW_START + 84)
 
+// Smart Rewrite with AI command
+
+
 #endif  // #ifndef INCLUDED_SFX2_SFXSIDS_HRC
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

@@ -1014,6 +1014,8 @@ void SwBaseShell::Execute(SfxRequest &rReq)
         case FN_UPDATE_INPUTFIELDS:
             rSh.UpdateInputFields();
             break;
+            
+
 
         case FN_PREV_BOOKMARK:
             rReq.SetReturnValue(SfxBoolItem( nSlot, rSh.GoPrevBookmark()));
@@ -1767,6 +1769,8 @@ void SwBaseShell::GetState( SfxItemSet &rSet )
                     rSet.DisableItem( nWhich );
                 }
                 break;
+                
+
 
             case FN_CONVERT_TABLE_TO_TEXT:
             {

@@ -9729,6 +9729,23 @@ SfxVoidItem InsertHyperlink SID_INSERT_HYPERLINK
         GroupId = SfxGroupId::Insert;
 ]
 
+SfxVoidItem SmartRewrite SID_SMART_REWRITE
+()
+[
+        AutoUpdate = FALSE,
+        FastCall = FALSE,
+        ReadOnlyDoc = TRUE,
+        Toggle = FALSE,
+        Container = FALSE,
+        RecordAbsolute = FALSE,
+        RecordPerSet;
+
+        AccelConfig = TRUE,
+        MenuConfig = TRUE,
+        ToolBoxConfig = TRUE,
+        GroupId = SfxGroupId::Edit;
+]
+
 SfxVoidItem EditHyperlink SID_EDIT_HYPERLINK
 (SfxInt32Item PositionX FN_PARAM_1, SfxInt32Item PositionY FN_PARAM_2)
 [

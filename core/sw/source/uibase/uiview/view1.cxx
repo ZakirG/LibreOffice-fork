@@ -18,6 +18,7 @@
  */
 
 #include <svl/eitem.hxx>
+#include <sfx2/sfxsids.hrc>
 #include <svx/ruler.hxx>
 #include <idxmrk.hxx>
 #include <view.hxx>
@@ -196,6 +197,50 @@ void SwView::StateFormatPaintbrush(SfxItemSet &rSet)
     }
     else
         rSet.Put(SfxBoolItem(SID_FORMATPAINTBRUSH, bHasContent));
+}
+
+void SwView::ExecSmartRewrite(SfxRequest const & rReq)
+{
+    std::cerr << "*** DEBUG: !!!! SwView::ExecSmartRewrite called! SID_SMART_REWRITE=" << SID_SMART_REWRITE << " !!!!" << std::endl;
+    
+    // Get selected text
+    OUString sSelectedText;
+    GetWrtShell().GetSelectedText(sSelectedText);
+    
+    std::cerr << "*** DEBUG: SwView::ExecSmartRewrite - selected text: '" << sSelectedText.toUtf8().getStr() << "'" << std::endl;
+    
+    if (!sSelectedText.isEmpty())
+    {
+        std::cerr << "*** DEBUG: SwView::ExecSmartRewrite - executing command!" << std::endl;
+        // TODO: Show the SmartRewrite dialog from Prompt 2
+        // For now, just handle the command (placeholder implementation)
+        // This proves the menu item is working and connected to the handler
+    }
+    else
+    {
+        std::cerr << "*** DEBUG: SwView::ExecSmartRewrite - no text selected!" << std::endl;
+    }
+}
+
+void SwView::StateSmartRewrite(SfxItemSet &rSet)
+{
+    std::cerr << "*** DEBUG: !!!! SwView::StateSmartRewrite called! SID_SMART_REWRITE=" << SID_SMART_REWRITE << " !!!!" << std::endl;
+    
+    // Enable only when text is selected
+    OUString sSelectedText;
+    GetWrtShell().GetSelectedText(sSelectedText);
+    
+    std::cerr << "*** DEBUG: SwView::StateSmartRewrite - selected text: '" << sSelectedText.toUtf8().getStr() << "'" << std::endl;
+    
+    if (sSelectedText.isEmpty())
+    {
+        std::cerr << "*** DEBUG: SwView::StateSmartRewrite - disabling because no text selected" << std::endl;
+        rSet.DisableItem( SID_SMART_REWRITE );
+    }
+    else
+    {
+        std::cerr << "*** DEBUG: SwView::StateSmartRewrite - enabling because text is selected" << std::endl;
+    }
 }
 
 void SwView::UpdateWordCount(SfxShell* pShell, sal_uInt16 nSlot)

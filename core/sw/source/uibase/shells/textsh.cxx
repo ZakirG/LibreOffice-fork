@@ -121,6 +121,7 @@ IMPL_STATIC_LINK( SwTextShell, DialogClosedHdl, css::ui::dialogs::DialogClosedEv
 
 void SwTextShell::InitInterface_Impl()
 {
+    std::cerr << "*** DEBUG: Registering text popup menu" << std::endl;
     GetStaticInterface()->RegisterPopupMenu(u"text"_ustr);
 
     GetStaticInterface()->RegisterObjectBar(SFX_OBJECTBAR_OBJECT, SfxVisibilityFlags::Invisible, ToolbarId::Text_Toolbox_Sw);

@@ -833,9 +833,12 @@ SwView::SwView(SfxViewFrame& _rFrame, SfxViewShell* pOldSh)
         CreateScrollbar( false );
     }
 
+    std::cerr << "*** DEBUG: About to create SwView_Impl ***" << std::endl;
     m_pViewImpl.reset(new SwView_Impl(this));
+    std::cerr << "*** DEBUG: SwView_Impl created, setting name and window ***" << std::endl;
     SetName(u"View"_ustr);
     SetWindow( m_pEditWin );
+    std::cerr << "*** DEBUG: Name and window set ***" << std::endl;
 
     m_aTimer.SetTimeout( 120 );
 
@@ -918,7 +921,9 @@ SwView::SwView(SfxViewFrame& _rFrame, SfxViewShell* pOldSh)
             aUsrPref.SetZoomType(pUsrPref->GetDefaultZoomType());
             aUsrPref.SetZoom(pUsrPref->GetDefaultZoomValue());
         }
+        std::cerr << "*** DEBUG: About to create SwWrtShell ***" << std::endl;
         m_pWrtShell.reset(new SwWrtShell(rDoc, m_pEditWin, *this, &aUsrPref));
+        std::cerr << "*** DEBUG: SwWrtShell created successfully ***" << std::endl;
         // creating an SwView from a SwPagePreview needs to
         // add the SwViewShell to the ring of the other SwViewShell(s)
         if(m_bOldShellWasPagePreview)
@@ -1003,8 +1008,11 @@ SwView::SwView(SfxViewFrame& _rFrame, SfxViewShell* pOldSh)
     m_pVRuler->SetLineHeight( 551 );  // default line height
 
     // Set DocShell
+    std::cerr << "*** DEBUG: Creating SwViewGlueDocShell ***" << std::endl;
     m_xGlueDocShell.reset(new SwViewGlueDocShell(*this, rDocSh));
+    std::cerr << "*** DEBUG: Creating SwPostItMgr ***" << std::endl;
     m_pPostItMgr.reset(new SwPostItMgr(this));
+    std::cerr << "*** DEBUG: SwPostItMgr created ***" << std::endl;
 #if ENABLE_YRS
     m_pWrtShell->GetDoc()->getIDocumentState().YrsInitAcceptor();
 #endif
@@ -1012,10 +1020,14 @@ SwView::SwView(SfxViewFrame& _rFrame, SfxViewShell* pOldSh)
     // Check and process the DocSize. Via the handler, the shell could not
     // be found, because the shell is not known in the SFX management
     // within the CTOR phase.
+    std::cerr << "*** DEBUG: About to call DocSzChgd ***" << std::endl;
     DocSzChgd( m_pWrtShell->GetDocSize() );
+    std::cerr << "*** DEBUG: DocSzChgd completed ***" << std::endl;
 
+    std::cerr << "*** DEBUG: Setting AttrChangedNotify link ***" << std::endl;
         // Set AttrChangedNotify link
     m_pWrtShell->SetChgLnk(LINK(this, SwView, AttrChangedNotify));
+    std::cerr << "*** DEBUG: AttrChangedNotify link set ***" << std::endl;
 
     if (rDocSh.GetCreateMode() == SfxObjectCreateMode::EMBEDDED &&
         !rDocSh.GetVisArea(ASPECT_CONTENT).IsEmpty())
@@ -1146,14 +1158,26 @@ SwView::SwView(SfxViewFrame& _rFrame, SfxViewShell* pOldSh)
         SwXTextDocument* pModel = comphelper::getFromUnoTunnel<SwXTextDocument>(GetCurrentDocument());
         SfxLokHelper::notifyViewRenderState(this, pModel);
     }
+
+    // TEMPORARILY DISABLED SmartRewriteInterceptor to isolate hang issue
+    // if (m_pViewImpl)
+    // {
+    //     m_pViewImpl->InitializeSmartRewriteInterceptor();
+    // }
 }
 
 SwViewGlueDocShell::SwViewGlueDocShell(SwView& rView, SwDocShell& rDocSh)
     : m_rView(rView)
 {
+    std::cerr << "*** DEBUG: SwViewGlueDocShell constructor - START ***" << std::endl;
     // Set DocShell
+    std::cerr << "*** DEBUG: Calling rDocSh.SetView() ***" << std::endl;
     rDocSh.SetView(&m_rView);
+    std::cerr << "*** DEBUG: rDocSh.SetView() completed ***" << std::endl;
+    std::cerr << "*** DEBUG: Calling SwModule::get()->SetView() ***" << std::endl;
     SwModule::get()->SetView(&m_rView);
+    std::cerr << "*** DEBUG: SwModule::get()->SetView() completed ***" << std::endl;
+    std::cerr << "*** DEBUG: SwViewGlueDocShell constructor - END ***" << std::endl;
 }
 
 SwViewGlueDocShell::~SwViewGlueDocShell()

@@ -679,12 +679,12 @@ class SwUINumRuleItem;
 #define FN_UNO_TABLE_TEMPLATE_NAME          (FN_EXTRA2 + 126)
 #define FN_UNO_VISIBLE_AREA_WIDTH           (FN_EXTRA2 + 127)
 #define FN_UNO_VISIBLE_AREA_HEIGHT          (FN_EXTRA2 + 128)
-
 #define FN_UNO_TRANSFORMED_GRAPHIC          (FN_EXTRA2 + 129)
 #define FN_UNO_GRAPHIC_PREVIEW              (FN_EXTRA2 + 130)
 #define FN_UNO_LINEBREAK (FN_EXTRA2 + 131)
 #define FN_UNO_CONTENT_CONTROL (FN_EXTRA2 + 132)
 #define FN_UNO_IS_CONTENT_EMPTY  (FN_EXTRA2 + 133)
+#define FN_SMART_REWRITE          (FN_EXTRA2 + 134)
 
 // Area: Help
 // Region: Traveling & Selection

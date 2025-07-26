@@ -658,6 +658,9 @@ public:
 
     void ExecFormatPaintbrush(SfxRequest const &);
     void StateFormatPaintbrush(SfxItemSet &);
+    
+    void ExecSmartRewrite(SfxRequest const &);
+    void StateSmartRewrite(SfxItemSet &);
 
     // public for D&D
     ErrCode     InsertGraphic( const OUString &rPath, const OUString &rFilter,

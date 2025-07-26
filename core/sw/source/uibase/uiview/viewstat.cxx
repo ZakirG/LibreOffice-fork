@@ -607,6 +607,10 @@ void SwView::GetState(SfxItemSet &rSet)
                     rSet.DisableItem(nWhich);
             }
             break;
+        case FN_SMART_REWRITE:
+            std::cerr << "*** DEBUG: SwView::GetState processing FN_SMART_REWRITE!" << std::endl;
+            // Don't handle here - let the SDI system call StateSmartRewrite
+            break;
         }
         nWhich = aIter.NextWhich();
     }

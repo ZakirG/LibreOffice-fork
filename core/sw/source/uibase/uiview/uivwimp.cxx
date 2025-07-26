@@ -34,7 +34,9 @@
 
 #include <sfx2/docinsert.hxx>
 #include <sfx2/request.hxx>
+#include <SmartRewriteInterceptor.hxx>
 #include <uivwimp.hxx>
+#include <iostream>
 #include <unotxvw.hxx>
 #include <unodispatch.hxx>
 #include <swmodule.hxx>
@@ -55,14 +57,17 @@ SwView_Impl::SwView_Impl(SwView* pShell)
     , m_bSelectObject(false)
     , m_bEditingPositionSet(false)
 {
-    mxXTextView = new SwXTextView(m_pView);
+        mxXTextView = new SwXTextView(m_pView);
     m_xDispatchProviderInterceptor = new SwXDispatchProviderInterceptor(*m_pView);
+    // Don't create SmartRewriteInterceptor in constructor - defer until view is fully initialized
 }
 
 SwView_Impl::~SwView_Impl()
 {
+    SAL_INFO("sw.smartrewrite", "SwView_Impl destructor - START");
     if(m_xDispatchProviderInterceptor)
         m_xDispatchProviderInterceptor->Invalidate();
+    // ShutdownSmartRewriteInterceptor(); // DISABLED
     mxXTextView->Invalidate();
     mxXTextView.clear();
 
@@ -80,7 +85,28 @@ SwView_Impl::~SwView_Impl()
 #endif
     m_pDocInserter.reset();
     m_pRequest.reset();
+    SAL_INFO("sw.smartrewrite", "SwView_Impl destructor - END");
 }
+
+// DISABLED SmartRewriteInterceptor methods to isolate hang issue
+/*
+void SwView_Impl::InitializeSmartRewriteInterceptor()
+{
+    if (!m_xSmartRewriteInterceptor.is() && m_pView)
+    {
+        m_xSmartRewriteInterceptor = new SmartRewriteInterceptor(*m_pView);
+    }
+}
+
+void SwView_Impl::ShutdownSmartRewriteInterceptor()
+{
+    if(m_xSmartRewriteInterceptor)
+    {
+        m_xSmartRewriteInterceptor->Invalidate();
+        m_xSmartRewriteInterceptor = nullptr;
+    }
+}
+*/
 
 void SwView_Impl::SetShellMode(ShellMode eSet)
 {

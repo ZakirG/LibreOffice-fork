@@ -408,6 +408,12 @@ interface BaseText
         StateMethod = GetState;
         DisableFlags="SfxDisableFlags::SwOnProtectedCursor";
     ]
+    SID_SMART_REWRITE
+    [
+        ExecMethod = Execute ;
+        StateMethod = GetState;
+        DisableFlags="SfxDisableFlags::SwOnProtectedCursor";
+    ]
     SID_RUBY_DIALOG
     [
         ExecMethod = Execute ;
@@ -785,6 +791,7 @@ interface BaseText
         StateMethod = NoState ;
         DisableFlags="SfxDisableFlags::SwOnProtectedCursor";
     ]
+
     FN_GOTO_REFERENCE // status(final|play)
     [
         ExecMethod = Execute ;

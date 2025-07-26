@@ -157,6 +157,7 @@ $(eval $(call gb_Library_add_exception_objects,swui,\
     sw/source/ui/misc/srtdlg \
     $(if $(ENABLE_CURL),sw/source/ui/misc/translatelangselect) \
     sw/source/ui/misc/swmodalredlineacceptdlg \
+    sw/source/ui/smartrewrite/SmartRewriteDialogController \
     sw/source/ui/misc/titlepage \
     sw/source/ui/table/colwd \
     sw/source/ui/table/convert \
