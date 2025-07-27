@@ -90,6 +90,7 @@ $(eval $(call gb_Library_use_libraries,sw,\
 
 $(eval $(call gb_Library_use_externals,sw,\
 	boost_headers \
+	curl \
 	frozen \
 	icui18n \
 	icuuc \

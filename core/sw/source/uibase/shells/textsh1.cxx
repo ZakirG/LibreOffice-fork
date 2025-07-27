@@ -45,8 +45,365 @@
 #include <SmartRewriteDialogController.hxx>
 #include <vcl/weld.hxx>
 #include <com/sun/star/uno/Exception.hpp>
+#include "../config/SmartRewriteService.hxx"
+#include <comphelper/string.hxx>
+#include <vcl/svapp.hxx>
+#include <comphelper/solarmutex.hxx>
+#include <tools/link.hxx>
+#include <curl/curl.h>
+#include <thread>
+#include <memory>
+#include <iostream>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <IDocumentContentOperations.hxx>
+#include <IDocumentUndoRedo.hxx>
+#include <undobj.hxx>
+#include <swundo.hxx>
+#include <doc.hxx>
+#include <pam.hxx>
+#include <UndoCore.hxx>
+#include <wrtsh.hxx>
 #include <sfx2/bindings.hxx>
 #include <sfx2/namedcolor.hxx>
+
+// CURL callback for writing response data
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* response)
+{
+    size_t realsize = size * nmemb;
+    response->append(static_cast<char*>(contents), realsize);
+    return realsize;
+}
+
+// Structure to hold API call data
+struct SmartRewriteApiData
+{
+    OUString sSelectedText;
+    OUString sRewriteStyle;
+    OUString sCustomPrompt;
+    OUString sApiKey;
+    OUString sEndpointUrl;
+    OUString sModel;
+    SwWrtShell* pWrtShell;
+    
+    SmartRewriteApiData(const OUString& rSelectedText, const OUString& rStyle, 
+                       const OUString& rPrompt, SwWrtShell* pShell)
+        : sSelectedText(rSelectedText), sRewriteStyle(rStyle), sCustomPrompt(rPrompt), pWrtShell(pShell)
+    {
+        sApiKey = SmartRewriteService::GetApiKey();
+        sEndpointUrl = SmartRewriteService::GetEndpointUrl();  
+        sModel = SmartRewriteService::GetMode();
+    }
+};
+
+// Function to construct JSON payload for OpenAI API
+static OUString ConstructJsonPayload(const SmartRewriteApiData& rData)
+{
+    // Construct the system prompt based on style
+    OUString sSystemPrompt = u"You are a professional writing assistant. Rewrite the provided text in a "_ustr;
+    if (rData.sRewriteStyle == u"Professional")
+        sSystemPrompt += u"professional, formal tone while maintaining clarity and precision."_ustr;
+    else if (rData.sRewriteStyle == u"Concise")
+        sSystemPrompt += u"concise, brief manner while preserving the essential meaning."_ustr;
+    else if (rData.sRewriteStyle == u"Friendly")
+        sSystemPrompt += u"friendly, conversational tone while keeping the message clear."_ustr;
+    else if (rData.sRewriteStyle == u"Academic")
+        sSystemPrompt += u"academic, scholarly tone suitable for formal documents."_ustr;
+    else if (rData.sRewriteStyle == u"Creative")
+        sSystemPrompt += u"creative, engaging manner while maintaining readability."_ustr;
+    else
+        sSystemPrompt += u"clear, well-structured manner."_ustr;
+        
+    // Add custom instructions if provided
+    if (!rData.sCustomPrompt.isEmpty()) {
+        sSystemPrompt += u" Additional instructions: "_ustr + rData.sCustomPrompt;
+    }
+    
+    // Escape JSON special characters in text
+    OUString sEscapedText = rData.sSelectedText;
+    sEscapedText = sEscapedText.replaceAll(u"\\", u"\\\\");
+    sEscapedText = sEscapedText.replaceAll(u"\"", u"\\\"");
+    sEscapedText = sEscapedText.replaceAll(u"\n", u"\\n");
+    sEscapedText = sEscapedText.replaceAll(u"\r", u"\\r");
+    sEscapedText = sEscapedText.replaceAll(u"\t", u"\\t");
+    
+    OUString sEscapedSystem = sSystemPrompt;
+    sEscapedSystem = sEscapedSystem.replaceAll(u"\\", u"\\\\");
+    sEscapedSystem = sEscapedSystem.replaceAll(u"\"", u"\\\"");
+    sEscapedSystem = sEscapedSystem.replaceAll(u"\n", u"\\n");
+    sEscapedSystem = sEscapedSystem.replaceAll(u"\r", u"\\r");
+    sEscapedSystem = sEscapedSystem.replaceAll(u"\t", u"\\t");
+    
+    // Construct JSON payload
+    OUString sJson = u"{"_ustr
+        u"\"model\": \"" + rData.sModel + u"\","
+        u"\"messages\": ["
+            u"{"
+                u"\"role\": \"system\","
+                u"\"content\": \"" + sEscapedSystem + u"\""
+            u"},"
+            u"{"
+                u"\"role\": \"user\","
+                u"\"content\": \"" + sEscapedText + u"\""
+            u"}"
+        u"],"
+        u"\"max_tokens\": 2000,"
+        u"\"temperature\": 0.3"
+    u"}"_ustr;
+    
+    return sJson;
+}
+
+// Custom undo object for Smart Rewrite operations
+class SwUndoSmartRewrite final : public SwUndo
+{
+private:
+    SwNodeIndex m_nSttNode;
+    SwNodeIndex m_nEndNode;  
+    sal_Int32 m_nSttContent;
+    sal_Int32 m_nEndContent;
+    OUString m_sOriginalText;
+    OUString m_sRewrittenText;
+    
+public:
+    SwUndoSmartRewrite(const SwPaM& rPaM, const OUString& rOriginalText, const OUString& rRewrittenText)
+        : SwUndo(SwUndoId::REPLACE, rPaM.GetDoc())
+        , m_nSttNode(rPaM.GetMark()->GetNode())
+        , m_nEndNode(rPaM.GetPoint()->GetNode())
+        , m_nSttContent(rPaM.GetMark()->GetContentIndex())
+        , m_nEndContent(rPaM.GetPoint()->GetContentIndex())
+        , m_sOriginalText(rOriginalText)
+        , m_sRewrittenText(rRewrittenText)
+    {
+    }
+
+    virtual void UndoImpl(::sw::UndoRedoContext & rContext) override
+    {
+        SwDoc& rDoc = rContext.GetDoc();
+        SwPaM aPaM(m_nSttNode.GetNode(), m_nSttContent, m_nEndNode.GetNode(), m_nEndContent);
+        
+        // Replace current text with original text
+        rDoc.getIDocumentContentOperations().ReplaceRange(aPaM, m_sOriginalText, false);
+    }
+
+    virtual void RedoImpl(::sw::UndoRedoContext & rContext) override
+    {
+        SwDoc& rDoc = rContext.GetDoc();
+        SwPaM aPaM(m_nSttNode.GetNode(), m_nSttContent, m_nEndNode.GetNode(), m_nEndContent);
+        
+        // Replace original text with rewritten text
+        rDoc.getIDocumentContentOperations().ReplaceRange(aPaM, m_sRewrittenText, false);
+    }
+};
+
+// Structure to hold API result data for main thread processing
+struct SmartRewriteResult
+{
+    std::shared_ptr<SmartRewriteApiData> pApiData;
+    OUString sRewrittenText;
+    bool bSuccess;
+    OUString sErrorMessage;
+    
+    SmartRewriteResult(std::shared_ptr<SmartRewriteApiData> pData, const OUString& rRewrittenText)
+        : pApiData(pData), sRewrittenText(rRewrittenText), bSuccess(true)
+    {}
+    
+    SmartRewriteResult(std::shared_ptr<SmartRewriteApiData> pData, const OUString& rErrorMsg, bool)
+        : pApiData(pData), bSuccess(false), sErrorMessage(rErrorMsg)
+    {}
+};
+
+// Function to parse OpenAI JSON response and extract rewritten text
+static OUString ParseOpenAIResponse(const std::string& sJsonResponse)
+{
+    try {
+        std::stringstream aStream(sJsonResponse);
+        boost::property_tree::ptree aRoot;
+        boost::property_tree::read_json(aStream, aRoot);
+        
+        // Navigate to choices[0].message.content
+        auto choicesOpt = aRoot.get_child_optional("choices");
+        if (!choicesOpt || choicesOpt->empty()) {
+            std::cerr << "*** ERROR: No 'choices' array in API response" << std::endl;
+            return OUString();
+        }
+        
+        auto firstChoice = choicesOpt->begin()->second;
+        auto messageOpt = firstChoice.get_child_optional("message");
+        if (!messageOpt) {
+            std::cerr << "*** ERROR: No 'message' object in first choice" << std::endl;
+            return OUString();
+        }
+        
+        std::string sContent = messageOpt->get<std::string>("content", "");
+        if (sContent.empty()) {
+            std::cerr << "*** ERROR: Empty 'content' in message" << std::endl;
+            return OUString();
+        }
+        
+        return OUString::fromUtf8(sContent.c_str());
+        
+    } catch (const boost::property_tree::json_parser_error& e) {
+        std::cerr << "*** ERROR: JSON parsing failed: " << e.what() << std::endl;
+        return OUString();
+    } catch (const std::exception& e) {
+        std::cerr << "*** ERROR: Exception parsing JSON: " << e.what() << std::endl;
+        return OUString();
+    }
+}
+
+// Helper class for main thread callback
+class SmartRewriteCallbackHandler
+{
+public:
+    DECL_STATIC_LINK(SmartRewriteCallbackHandler, ProcessResult, void*, void);
+};
+
+// Callback to process API result on main thread
+IMPL_STATIC_LINK(SmartRewriteCallbackHandler, ProcessResult, void*, pVoidResult, void)
+{
+    std::unique_ptr<SmartRewriteResult> pResult(static_cast<SmartRewriteResult*>(pVoidResult));
+    
+    std::cerr << "*** DEBUG: ProcessSmartRewriteResult called on main thread" << std::endl;
+    
+    if (!pResult->bSuccess) {
+        std::cerr << "*** ERROR: API call failed: " << pResult->sErrorMessage.toUtf8().getStr() << std::endl;
+        // TODO: Show error dialog to user
+        return;
+    }
+    
+    if (pResult->sRewrittenText.isEmpty()) {
+        std::cerr << "*** ERROR: No rewritten text received from API" << std::endl;
+        return;
+    }
+    
+    std::cerr << "*** DEBUG: Rewritten text: '" << pResult->sRewrittenText.toUtf8().getStr() << "'" << std::endl;
+    
+    // Get the document and perform text replacement
+    SwWrtShell* pWrtShell = pResult->pApiData->pWrtShell;
+    if (!pWrtShell) {
+        std::cerr << "*** ERROR: SwWrtShell pointer is null" << std::endl;
+        return;
+    }
+    
+    SwDoc& rDoc = *pWrtShell->GetDoc();
+    
+    // Create selection for original text
+    SwPaM* pPaM = pWrtShell->GetCursor();
+    if (!pPaM || !pPaM->HasMark()) {
+        std::cerr << "*** ERROR: No text selection found" << std::endl;
+        return;
+    }
+    
+    // Create undo object before making changes
+    std::unique_ptr<SwUndoSmartRewrite> pUndo = std::make_unique<SwUndoSmartRewrite>(
+        *pPaM, pResult->pApiData->sSelectedText, pResult->sRewrittenText);
+    
+    // Add undo object to undo manager
+    rDoc.GetIDocumentUndoRedo().AppendUndo(std::move(pUndo));
+    
+    // Replace the selected text with rewritten text
+    rDoc.getIDocumentContentOperations().ReplaceRange(*pPaM, pResult->sRewrittenText, false);
+    
+    std::cerr << "*** SUCCESS: Text replacement completed with undo support!" << std::endl;
+}
+
+// Function to perform the HTTP API call in background thread
+static void PerformApiCall(std::shared_ptr<SmartRewriteApiData> pData)
+{
+    std::cerr << "*** DEBUG: Starting background API call thread..." << std::endl;
+    
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        std::cerr << "*** ERROR: Failed to initialize CURL" << std::endl;
+        return;
+    }
+    
+    try {
+        // Prepare JSON payload
+        OUString sJsonPayload = ConstructJsonPayload(*pData);
+        OString sJsonUtf8 = OUStringToOString(sJsonPayload, RTL_TEXTENCODING_UTF8);
+        
+        std::cerr << "*** DEBUG: JSON Payload: " << sJsonUtf8.getStr() << std::endl;
+        
+        // Prepare URL
+        OString sUrlUtf8 = OUStringToOString(pData->sEndpointUrl, RTL_TEXTENCODING_UTF8);
+        
+        // Prepare response container
+        std::string response;
+        
+        // Set CURL options
+        curl_easy_setopt(curl, CURLOPT_URL, sUrlUtf8.getStr());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, sJsonUtf8.getStr());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, sJsonUtf8.getLength());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L); // 30 second timeout
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        
+        // Prepare headers
+        struct curl_slist* headers = nullptr;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        
+        // Add authorization header
+        OString sAuthHeader = "Authorization: Bearer " + OUStringToOString(pData->sApiKey, RTL_TEXTENCODING_UTF8);
+        headers = curl_slist_append(headers, sAuthHeader.getStr());
+        
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        
+        std::cerr << "*** DEBUG: Performing CURL request..." << std::endl;
+        
+        // Perform the request
+        CURLcode res = curl_easy_perform(curl);
+        long response_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+        
+        // Clean up headers
+        curl_slist_free_all(headers);
+        
+        std::cerr << "*** DEBUG: CURL result: " << res << ", HTTP code: " << response_code << std::endl;
+        std::cerr << "*** DEBUG: Response body: " << response.c_str() << std::endl;
+        
+        // Handle response
+        if (res == CURLE_OK && response_code == 200) {
+            // Success - parse JSON and post result to main thread
+            std::cerr << "*** SUCCESS: API call completed successfully!" << std::endl;
+            std::cerr << "*** DEBUG: Full API Response: " << response.c_str() << std::endl;
+            
+            OUString sRewrittenText = ParseOpenAIResponse(response);
+            if (!sRewrittenText.isEmpty()) {
+                // Create result object and post to main thread
+                SmartRewriteResult* pResult = new SmartRewriteResult(pData, sRewrittenText);
+                Application::PostUserEvent(LINK(nullptr, SmartRewriteCallbackHandler, ProcessResult), pResult);
+                std::cerr << "*** DEBUG: Posted successful result to main thread" << std::endl;
+            } else {
+                // Parsing failed - post error to main thread
+                SmartRewriteResult* pResult = new SmartRewriteResult(pData, u"Failed to parse API response"_ustr, false);
+                Application::PostUserEvent(LINK(nullptr, SmartRewriteCallbackHandler, ProcessResult), pResult);
+                std::cerr << "*** ERROR: JSON parsing failed, posted error to main thread" << std::endl;
+            }
+        } else {
+            // HTTP error - post error to main thread
+            OUString sError = u"API call failed. HTTP code: "_ustr + OUString::number(response_code) +
+                             u", CURL error: "_ustr + OUString::number(res);
+            SmartRewriteResult* pResult = new SmartRewriteResult(pData, sError, false);
+            Application::PostUserEvent(LINK(nullptr, SmartRewriteCallbackHandler, ProcessResult), pResult);
+            
+            std::cerr << "*** ERROR: API call failed. CURL result: " << res 
+                      << ", HTTP code: " << response_code << std::endl;
+            std::cerr << "*** ERROR: Response: " << response.c_str() << std::endl;
+        }
+        
+    } catch (const std::exception& e) {
+        std::cerr << "*** ERROR: Exception in API call: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "*** ERROR: Unknown exception in API call" << std::endl;
+    }
+    
+    curl_easy_cleanup(curl);
+    std::cerr << "*** DEBUG: Background API call thread completed" << std::endl;
+}
+
 #include <sfx2/viewfrm.hxx>
 #include <vcl/unohelp2.hxx>
 #include <vcl/weld.hxx>
@@ -1276,8 +1633,41 @@ void SwTextShell::Execute(SfxRequest &rReq)
                     
                     if (nResult == RET_OK)
                     {
-                        // TODO: Process the dialog results in future prompts
-                        std::cerr << "*** SUCCESS: Smart Rewrite dialog completed with OK" << std::endl;
+                        // Extract dialog results
+                        OUString sRewriteStyle = aDlg.GetSelectedStyle();
+                        OUString sCustomPrompt = aDlg.GetCustomPrompt();
+                        
+                        std::cerr << "*** DEBUG: Dialog OK - Style: '" << sRewriteStyle.toUtf8().getStr() 
+                                  << "', Custom: '" << sCustomPrompt.toUtf8().getStr() << "'" << std::endl;
+                        
+                        // Check if Smart Rewrite is properly configured
+                        if (!aDlg.IsConfigurationValid())
+                        {
+                            std::cerr << "*** ERROR: Smart Rewrite configuration is invalid" << std::endl;
+                            // TODO: Show error dialog to user
+                            break;
+                        }
+                        
+                        // Prepare for asynchronous API call
+                        std::cerr << "*** DEBUG: Starting asynchronous AI API call..." << std::endl;
+                        
+                        // Create API data structure
+                        auto pApiData = std::make_shared<SmartRewriteApiData>(
+                            sSelectedText, sRewriteStyle, sCustomPrompt, &rWrtSh);
+                        
+                        std::cerr << "*** DEBUG: API Data prepared:" << std::endl;
+                        std::cerr << "   Selected Text: '" << sSelectedText.toUtf8().getStr() << "'" << std::endl;
+                        std::cerr << "   Style: '" << sRewriteStyle.toUtf8().getStr() << "'" << std::endl;
+                        std::cerr << "   Custom Prompt: '" << sCustomPrompt.toUtf8().getStr() << "'" << std::endl;
+                        std::cerr << "   API Key: " << (pApiData->sApiKey.isEmpty() ? "NOT SET" : "SET") << std::endl;
+                        std::cerr << "   Endpoint: '" << pApiData->sEndpointUrl.toUtf8().getStr() << "'" << std::endl;
+                        std::cerr << "   Model: '" << pApiData->sModel.toUtf8().getStr() << "'" << std::endl;
+                        
+                        // Start background thread for API call
+                        std::thread apiThread(PerformApiCall, pApiData);
+                        apiThread.detach(); // Detach thread to run independently
+                        
+                        std::cerr << "*** DEBUG: Background API thread started and detached" << std::endl;
                     }
                     else
                     {

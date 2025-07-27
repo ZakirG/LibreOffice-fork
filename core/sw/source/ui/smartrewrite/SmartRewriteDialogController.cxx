@@ -10,6 +10,7 @@
 #include "SmartRewriteDialogController.hxx"
 #include <wrtsh.hxx>
 #include <sal/log.hxx>
+#include "../../uibase/config/SmartRewriteService.hxx"
 
 using namespace ::com::sun::star;
 
@@ -99,9 +100,8 @@ OUString SmartRewriteDialogController::GetCustomPrompt() const
 
 bool SmartRewriteDialogController::IsConfigurationValid() const
 {
-    // For now, return true - configuration checking will be implemented in later prompts
-    // when the SmartRewriteService dependency is properly resolved
-    return true;
+    // Check if Smart Rewrite is properly configured
+    return SmartRewriteService::IsConfigured();
 }
 
 IMPL_LINK_NOARG(SmartRewriteDialogController, StyleComboChangedHdl, weld::ComboBox&, void)
