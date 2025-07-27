@@ -1,6 +1,6 @@
 # Docs Folder
 
-In this docs folder are a ton of planning documents I built to study the codebase and plan out new features.
+In the docs folder are a ton of planning documents I built to study the codebase and plan out new features. I used Gemini 2.5 Pro to study the codebase, then I provided those documents as context to Claude Sonnet 4 when building new features.
 
 # My PRD
 
@@ -56,36 +56,35 @@ looks good. lets make another revision -- i want you to use the codebase to add 
 
 [output not shown]
 
-
-# Exploratory conversations
+# Initial Exploratory Conversations
 
 Me to ChatGPT 4o:
 what is LibreOffice
 
-ChatGPT 4o:
-LibreOffice is a free and open-source office suite developed by The Document Foundation. It’s similar to Microsoft Office and includes several powerful applications for word processing, spreadsheets, presentations, and more.
-
-Here's a quick breakdown of the main components:
-
-Writer – Word processor (like Microsoft Word)
-
-Calc – Spreadsheet application (like Excel)
-
-Impress – Presentation tool (like PowerPoint)
-
-Draw – Vector graphics and diagramming tool (like Visio)
-
-Base – Database management system (like Access)
-
-Math – Formula and equation editor
-
-LibreOffice runs on Windows, macOS, and Linux. It uses the Open Document Format (ODF) by default but can also open and save Microsoft Office file formats (.docx, .xlsx, .pptx, etc.).
-
-Because it’s open-source, anyone can modify the source code. This makes it a great choice for custom projects—like your idea of tailoring it to a specific niche.
+[output not shown]
 
 
 
 
+Me to ChatGPT 4o:
+i'm forking LibreOffice and tailoring it to a custom niche of target users for a class project.
+ideas so far -- 
+
+Potential target users:
+- Teens in highschool looking for a nice-looking easy-to-use notes app.
+- Musicians versioning their mix revisions with notes [make it easy to drag in an mp3/wav file and write mix notes below it]
+
+got more ideas? part of my requirement is to integrate AWS and make the app mobile-friendly. We could build a user-friendly mobile notes app, like iPhone notes or Evernote, with smooth cloud-native editing that allows easy syncing between phone and computer. But I need help brainstorming target niches
+
+
+
+
+Me to ChatGPT 4o:
+how should i implement auth in my app? AWS Cogito, or is there an easier way? i'm in a rush and want to build this quickly
+
+
+details of my app:
+[pasted full output of PRD and codebase overview]
 
 
 
