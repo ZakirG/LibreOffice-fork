@@ -1,6 +1,30 @@
+# Docs Folder
+
+In this docs folder are a ton of planning documents I built to study the codebase and plan out new features.
+
 # My PRD
 
-[TODO: place PRD here once done]
+We have forked LibreOffice locally. We will be adding new features to it and refactoring the code as needed. But for the most part, we want to respect the conventions set by the codebase. And we must preserve all existing features without causing any regressions.
+
+Objectives: 
+- Turn LibreOffice into a cloud-native collaborative editing platform like Google Docs, but built on AWS, and mobile-friendly. 
+- Implement the 6 new features listed below.
+- Make sense of the codebase and document how we implement our changes.
+- Make our changes in a way that respects the existing structure of the codebase (described below in the section marked "codebase overview").
+- Optional: Make the UI beautiful and modern. This will require us to properly understand how the UI is built and rendered.
+
+Target niche:
+- Musicians and mix engineers. There's just two main features related to musicians, which is the feature where you can drag in an audio file and listen to it in the document and the feature where you can edit documents on your phone via the cloud storage and a mobile app.
+
+LibreOffice Fork
+
+Six new features:
+1) Modern authentication: a login feature with Google OAuth support. This will be enable the Save to Cloud feature. The same authentication that powers our LibreOffice cloud access will power the mobile-friendly webapp, allowing for easy document syncing across devices.
+2) File -> Save to Cloud. New option in File Menu. When the user clicks this, we save their file to AWS s3 so that the documents are accessible from anywhere. They can also open documents saved in the cloud while in LibreOffice. We fetch documents from the user's folder in the s3 bucket and allow the user to open them and continue editing while in LibreOffice.
+3) Cloud files view in LibreOffice. List all cloud-saved files from the user's folder in the s3 bucket.
+4) Mobile-responsive web-app to view documents saved to cloud
+5) Select text -> Smart rewrite with AI. Easily fixes all grammar, spelling, capitalization, punctuation.
+6) Drag in mp3 file that is playable within a document. Right now when you drag in an mp3, you just see a square image of a music note. No play button. I want to make that mp3 easily playable in the UI, easy play button. The user should be able to listen to the file and also write mix notes right underneath it.
 
 
 # Studying the Codebase and Building Targeted Documentation for New Features

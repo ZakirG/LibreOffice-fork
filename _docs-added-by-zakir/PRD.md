@@ -12,13 +12,15 @@ Objectives:
 Target niche:
 - Musicians and mix engineers. There's just two main features related to musicians, which is the feature where you can drag in an audio file and listen to it in the document and the feature where you can edit documents on your phone via the cloud storage and a mobile app.
 
-New features we will be building:
-1) Modern authentication: A companion Next.js web application will provide robust authentication using NextAuth (supporting email, Google, etc.). The desktop application will authenticate against this web app via a simple web flow and use JWTs for API communication.
-2) File -> Save to Cloud and File -> Refresh from Cloud (this will overwrite their local changes). This feature will be powered by our web application's API. On "Save", the desktop client will get a secure, short-lived "pre-signed" URL from the API to upload the document directly to AWS S3. This encapsulates all complexity on the server side. They can then view/edit these documents in their LibreDashboard, a web interface for their cloud-saved files.
-3) Mobile-responsive web-app deployed on Vercel to view documents saved to cloud
-4) Select text -> Smart rewrite with AI. Easily fixes all grammar, spelling, capitalization, punctuation.
-5) Easy add-font feature. You click "Add Font", you drag in a TTF file and it is automatically added to the list of available fonts. Easy document formatting.
-6) Drag in mp3 file. Right now when you drag in an mp3, you just see a square image of a music note. No play button. I want to make that mp3 easily playable in the UI, easy play button. The user should be able to listen to the file and also write mix notes right underneath it.
+LibreOffice Fork
+
+Six new features:
+1) Modern authentication: a login feature with Google OAuth support. This will be enable the Save to Cloud feature. The same authentication that powers our LibreOffice cloud access will power the mobile-friendly webapp, allowing for easy document syncing across devices.
+2) File -> Save to Cloud. New option in File Menu. When the user clicks this, we save their file to AWS s3 so that the documents are accessible from anywhere. They can also open documents saved in the cloud while in LibreOffice. We fetch documents from the user's folder in the s3 bucket and allow the user to open them and continue editing while in LibreOffice.
+3) Cloud files view in LibreOffice. List all cloud-saved files from the user's folder in the s3 bucket.
+4) Mobile-responsive web-app to view documents saved to cloud
+5) Select text -> Smart rewrite with AI. Easily fixes all grammar, spelling, capitalization, punctuation.
+6) Drag in mp3 file that is playable within a document. Right now when you drag in an mp3, you just see a square image of a music note. No play button. I want to make that mp3 easily playable in the UI, easy play button. The user should be able to listen to the file and also write mix notes right underneath it.
 
 
 # Codebase Details for New Features
