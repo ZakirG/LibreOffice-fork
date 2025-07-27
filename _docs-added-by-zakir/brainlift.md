@@ -76,7 +76,7 @@ Potential target users:
 
 got more ideas? part of my requirement is to integrate AWS and make the app mobile-friendly. We could build a user-friendly mobile notes app, like iPhone notes or Evernote, with smooth cloud-native editing that allows easy syncing between phone and computer. But I need help brainstorming target niches
 
-
+[output not shown]
 
 
 Me to ChatGPT 4o:
@@ -87,5 +87,5 @@ details of my app:
 [pasted full output of PRD and codebase overview]
 
 
-
+[output not shown]
 
