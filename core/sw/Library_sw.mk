@@ -724,6 +724,7 @@ $(eval $(call gb_Library_add_exception_objects,sw,\
     sw/source/uibase/shells/textsh \
     sw/source/uibase/shells/textsh1 \
     sw/source/uibase/shells/textsh2 \
+    sw/source/ui/smartrewrite/SmartRewriteDialogController \
     sw/source/uibase/shells/txtattr \
     sw/source/uibase/shells/txtcrsr \
     sw/source/uibase/shells/txtnum \

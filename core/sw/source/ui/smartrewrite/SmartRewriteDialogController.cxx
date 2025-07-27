@@ -20,18 +20,49 @@ SmartRewriteDialogController::SmartRewriteDialogController(weld::Widget* pParent
     : GenericDialogController(pParent, u"modules/swriter/ui/smartrewritedialog.ui"_ustr, u"SmartRewriteDialog"_ustr)
     , m_rSh(rSh)
     , m_sSelectedText(sSelectedText)
-    , m_xStyleCombo(m_xBuilder->weld_combo_box(u"style-combo"_ustr))
-    , m_xPromptText(m_xBuilder->weld_text_view(u"prompt-text"_ustr))
-    , m_xOKButton(m_xBuilder->weld_button(u"ok"_ustr))
-    , m_xCancelButton(m_xBuilder->weld_button(u"cancel"_ustr))
-    , m_xHelpButton(m_xBuilder->weld_button(u"help"_ustr))
 {
-    // Set up event handlers
-    m_xStyleCombo->connect_changed(LINK(this, SmartRewriteDialogController, StyleComboChangedHdl));
-    m_xOKButton->connect_clicked(LINK(this, SmartRewriteDialogController, OKClickHdl));
+    SAL_INFO("sw.smartrewrite", "GenericDialogController constructor completed successfully");
+    // Try to get UI elements with error checking
+    SAL_INFO("sw.smartrewrite", "Getting style-combo...");
+    m_xStyleCombo = m_xBuilder->weld_combo_box(u"style-combo"_ustr);
+    if (!m_xStyleCombo) {
+        SAL_WARN("sw.smartrewrite", "Failed to find style-combo widget - skipping for now");
+        // Don't throw, just continue without combo box for debugging
+    } else {
+        SAL_INFO("sw.smartrewrite", "style-combo found successfully");
+    }
     
-    // Set focus to the style combo by default
-    m_xStyleCombo->grab_focus();
+    m_xPromptText = m_xBuilder->weld_text_view(u"prompt-text"_ustr);
+    if (!m_xPromptText) {
+        SAL_WARN("sw.smartrewrite", "Failed to find prompt-text widget");
+        throw css::uno::RuntimeException(u"Failed to find prompt-text widget"_ustr);
+    }
+    
+    m_xOKButton = m_xBuilder->weld_button(u"ok"_ustr);
+    if (!m_xOKButton) {
+        SAL_WARN("sw.smartrewrite", "Failed to find ok button");
+        throw css::uno::RuntimeException(u"Failed to find ok button"_ustr);
+    }
+    
+    m_xCancelButton = m_xBuilder->weld_button(u"cancel"_ustr);
+    if (!m_xCancelButton) {
+        SAL_WARN("sw.smartrewrite", "Failed to find cancel button");
+        throw css::uno::RuntimeException(u"Failed to find cancel button"_ustr);
+    }
+    
+    m_xHelpButton = m_xBuilder->weld_button(u"help"_ustr);
+    if (!m_xHelpButton) {
+        SAL_WARN("sw.smartrewrite", "Failed to find help button");
+        throw css::uno::RuntimeException(u"Failed to find help button"_ustr);
+    }
+    
+    // Set up event handlers
+    if (m_xStyleCombo) {
+        m_xStyleCombo->connect_changed(LINK(this, SmartRewriteDialogController, StyleComboChangedHdl));
+        // Set focus to the style combo by default
+        m_xStyleCombo->grab_focus();
+    }
+    m_xOKButton->connect_clicked(LINK(this, SmartRewriteDialogController, OKClickHdl));
     
     // For now, always enable OK button - configuration checking will be added in later prompts
     m_xOKButton->set_sensitive(true);
